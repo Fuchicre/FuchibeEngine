@@ -5,5 +5,5 @@
   <Folder Name="/ソリューション項目/">
     <File Path=".editorconfig" />
   </Folder>
-  <Project Path="FuchibeEngine_DirectXGame.vcxproj" />
+  <Project Path="FuchibeEngine_DirectXGame.vcxproj" Id="3635444a-bc65-49bf-9406-1122327ee850" />
 </Solution>
