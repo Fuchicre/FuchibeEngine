@@ -30,7 +30,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	wc.lpfnWndProc = WindowProc;
 
 	// ウィンドウクラス名(なんでも良い)
-	wc.lpszClassName = L"CG2WindowClass";
+	wc.lpszClassName = L"FuchibeEngineWindowClass";
 
 	// インスタンスハンドル
 	wc.hInstance = GetModuleHandle(nullptr);
@@ -56,7 +56,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 利用するクラス名
 		wc.lpszClassName,
 		// タイトルバーの文字
-		L"CG2",
+		L"FuchibeEngine",
 		// よく見るウィンドウスタイル
 		WS_OVERLAPPEDWINDOW,
 		// 表示するX座標(Windowsに任せる)
