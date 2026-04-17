@@ -1,5 +1,8 @@
 #include <Windows.h>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <chrono>
 
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -78,6 +81,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
+
+	// ログ出力用のディレクトリを作成する
+	std::filesystem::create_directory("logs");
 
 	MSG msg{};
 
