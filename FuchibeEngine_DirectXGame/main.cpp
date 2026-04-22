@@ -8,8 +8,11 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <cassert>
+#include <dbgHelp.h>
+#include <strsafe.h>
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dbghelp.lib")
 
 //========================
 // ウィンドウプロシージャ
@@ -44,10 +47,10 @@ void Log(const std::string& message) {
 }
 
 //=======================
-// 文字列変換関数
+// 関数群
 //=======================
 
-#pragma region 文字列変換関数
+#pragma region 関数群
 
 // CoverString関数
 std::wstring ConvertString(const std::string& str) {
@@ -83,6 +86,34 @@ void Log(std::ostream& os, const std::string& message) {
 	OutputDebugStringA(message.c_str());
 }
 
+// CrashHandlerの登録
+static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
+
+	// 時刻を取得して、時刻を名前にしたファイルを作成する。Dumpディレクトリ以下に出力
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+	wchar_t filePath[MAX_PATH] = { 0 };
+	CreateDirectory(L"./Dump", nullptr);
+	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d02d-%02d02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
+	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+
+	// processId(このexeのId)とクラッシュ(例外)が発生したthreadIdを取得する
+	DWORD processId = GetCurrentProcessId();
+	DWORD threadId = GetCurrentThreadId();
+
+	// 設定情報を入力
+	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{ 0 };
+	minidumpInformation.ThreadId = threadId;
+	minidumpInformation.ExceptionPointers = exception;
+	minidumpInformation.ClientPointers = TRUE;
+
+	// Dumpを出力。miniDumpNormalは最低限の情報を出力するフラグ
+	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
+
+	// 他に関連付けられているSEH例外ハンドラがあれば実行する。通常はプロセスを終了させる
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
 #pragma endregion
 
 //===============
@@ -93,6 +124,9 @@ void Log(std::ostream& os, const std::string& message) {
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
+	// 誰も捕捉しなかった場合(Unhandled)に捕捉する関数を登録
+	SetUnhandledExceptionFilter(ExportDump);
 
 	WNDCLASS wc{};
 
@@ -239,9 +273,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ログ出力用のディレクトリを作成する
 	std::filesystem::create_directory("logs");
 
-	// std::formatによる文字列の組み立て
-	Log(std::format("LogFileTest"));
-
 	//==============================
 	// 現在時刻でのログファイルの作成
 	//==============================
@@ -272,6 +303,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ループに入る前に1回出す
 	Log(logStream, "Game Engine Started.");
+
+	// クラッシュテスト用
+	uint32_t* p = nullptr;
+	*p = 100;
 
 	//=====================
 	// メインループ

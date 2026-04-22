@@ -362,5 +362,8 @@ DirectXGame/imgui.ini
 
 # ログファイルの除外
 *.log
-
 /logs
+
+# dumpファイルの除外
+*.dmp
+Dumps/
