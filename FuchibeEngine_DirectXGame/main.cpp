@@ -2,10 +2,21 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <string>
 #include <fstream>
 #include <chrono>
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <cassert>
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
 
+//========================
 // ウィンドウプロシージャ
+//========================
+
+#pragma region ウィンドウプロシージャ
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 	// メッセージに応じてゲーム固有の処理を行う
@@ -25,10 +36,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 }
 
+#pragma endregion
+
 // ログ出力用の関数
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
 }
+
+//=======================
+// 文字列変換関数
+//=======================
+
+#pragma region 文字列変換関数
 
 // CoverString関数
 std::wstring ConvertString(const std::string& str) {
@@ -63,6 +82,14 @@ void Log(std::ostream& os, const std::string& message) {
 	os << message << std::endl;
 	OutputDebugStringA(message.c_str());
 }
+
+#pragma endregion
+
+//===============
+// メイン関数
+//===============
+
+#pragma region メイン関数
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
@@ -122,11 +149,104 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
+	//=================================
+	// 使用するアダプタを決定する
+	//=================================
+
+#pragma region 使用するアダプタを決定する
+
+	// DXGIファクトリーの生成
+	IDXGIFactory7* dxgiFactory = nullptr;
+
+	// HRESULTはWindows系のエラーコードであり、関数が成功したかどうかをSUCCEEDEDマクロで判定できる
+	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+
+	// 初期化の根本的な部分でエラーが発生した場合はプログラムが間違っているか、どうにもできない場合が多いので、assertで止める
+	assert(SUCCEEDED(hr));
+
+	// 使用するアダプタ用の変数。最初に nullptr で初期化しておく
+	IDXGIAdapter4* useAdapter = nullptr;
+
+	// 良い順にアダプタを頼む
+	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i,
+		DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; i++) {
+
+		// アダプタの情報を取得する
+		DXGI_ADAPTER_DESC3 adapterDesc{};
+
+		hr = useAdapter->GetDesc3(&adapterDesc);
+
+		// 取得できないのは一大事なので、assertで止める
+		assert(SUCCEEDED(hr));
+
+		// ソフトウェアアダプタでなければ採用する
+		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
+
+			// 採用したアダプタの情報をログに出力する(wstringの方なので注意する)
+			Log(ConvertString(std::format(L"Use Adapter:{}\n", adapterDesc.Description)));
+
+			break;
+		}
+		// ソフトウェアアダプタの場合は使わないので、解放して nullptr にしておく
+		useAdapter = nullptr;
+	}
+
+	// 適切なアダプタが見つからなかった場合は起動できないため、assertで止める
+	assert(useAdapter != nullptr);
+
+#pragma endregion
+
+	//======================
+	// D3D12Deviceの生成
+	//======================
+
+#pragma region D3D12Deviceの生成
+
+	ID3D12Device* device = nullptr;
+
+	// 機能レベルとログ出力用の文字列
+	D3D_FEATURE_LEVEL featureLevels[] = {
+		D3D_FEATURE_LEVEL_12_2,
+		D3D_FEATURE_LEVEL_12_1,
+		D3D_FEATURE_LEVEL_12_0
+	};
+
+	const char* featureLevelStrings[] = {
+		"12.2", "12.1", "12.0"
+	};
+
+	// 高い順に生成できるか試していく
+	for (size_t i = 0; i < _countof(featureLevels); i++) {
+
+		// 採用したアダプタでデバイスを生成
+		hr = D3D12CreateDevice(useAdapter, featureLevels[i], IID_PPV_ARGS(&device));
+
+		// 指定した機能レベルでデバイスが生成できたかを確認する
+		if (SUCCEEDED(hr)) {
+			Log(std::format("Feature Level:{}\n", featureLevelStrings[i]));
+			break;
+		}
+	}
+
+	// デバイスが生成できなかった場合は起動できないため、assertで止める
+	assert(device != nullptr);
+
+	// 初期化完了のログを出力する
+	Log("Conplete create D3D12 Device!!!\n");
+
+#pragma endregion
+
 	// ログ出力用のディレクトリを作成する
 	std::filesystem::create_directory("logs");
 
 	// std::formatによる文字列の組み立て
 	Log(std::format("LogFileTest"));
+
+	//==============================
+	// 現在時刻でのログファイルの作成
+	//==============================
+
+#pragma region 現在時刻でのログファイルの作成
 
 	// 現在時刻を取得 (UTC時刻)
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -148,8 +268,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
 
+#pragma endregion
+
 	// ループに入る前に1回出す
 	Log(logStream, "Game Engine Started.");
+
+	//=====================
+	// メインループ
+	//=====================
+
+#pragma region メインループ
 
 	MSG msg{};
 
@@ -166,8 +294,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 	}
 
+#pragma endregion
+
 	// 終了時に記録する
 	Log(logStream, "Game Engine Terminated.");
 
 	return 0;
 }
+
+#pragma endregion
