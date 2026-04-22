@@ -126,7 +126,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	std::filesystem::create_directory("logs");
 
 	// std::formatによる文字列の組み立て
-	Log(std::format("enemy"));
+	Log(std::format("LogFileTest"));
 
 	// 現在時刻を取得 (UTC時刻)
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -148,6 +148,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
 
+	// ループに入る前に1回出す
+	Log(logStream, "Game Engine Started.");
+
 	MSG msg{};
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -163,8 +166,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 	}
 
-	// 出力ウィンドウへの文字出力
-	/*OutputDebugStringA("Hello, DirectX!\n");*/
+	// 終了時に記録する
+	Log(logStream, "Game Engine Terminated.");
 
 	return 0;
 }
