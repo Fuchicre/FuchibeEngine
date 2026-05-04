@@ -128,6 +128,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 誰も捕捉しなかった場合(Unhandled)に捕捉する関数を登録
 	SetUnhandledExceptionFilter(ExportDump);
 
+	//=====================
+	// ウィンドウの生成
+	//=====================
+
+#pragma region ウィンドウの生成
+
 	WNDCLASS wc{};
 
 	// ウィンドウプロシージャ
@@ -182,6 +188,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
+
+#pragma endregion
+
+	//==================
+	// デバッグレイヤー
+	//==================
+
+#pragma region デバッグレイヤー
+
+#ifdef _DEBUG
+
+	ID3D12Debug1* debugController = nullptr;
+
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+
+		// デバッグレイヤーを有効にする
+		debugController->EnableDebugLayer();
+
+		// さらにGPU側でもチェックを行うようにする
+		debugController->SetEnableGPUBasedValidation(true);
+	}
+
+#endif
+
+#pragma endregion
 
 	//=================================
 	// 使用するアダプタを決定する
