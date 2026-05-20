@@ -367,3 +367,6 @@ DirectXGame/imgui.ini
 # dumpファイルの除外
 *.dmp
 Dumps/
+
+# imguiファイルの除外
+imgui.ini
