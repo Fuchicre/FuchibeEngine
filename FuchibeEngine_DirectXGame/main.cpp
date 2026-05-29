@@ -14,6 +14,8 @@
 #include <dxcapi.h>
 #include "MathUtils.h"
 #include "externals/DirectXTex/DirectXTex.h"
+#include "externals/DirectXTex/d3dx12.h"
+#include <vector>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -343,17 +345,17 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 	D3D12_HEAP_PROPERTIES heapProperties{};
 
 	// 細かい設定を行う
-	heapProperties.Type = D3D12_HEAP_TYPE_CUSTOM;
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 
 	// WriteBackポリシーでCPUアクセス可能
-	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 
 	// プロセッサの近くに配置
-	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// Resourceを生成して、Returnする
 	ID3D12Resource* resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&resource));
+	HRESULT hr = device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resource));
 	assert(SUCCEEDED(hr));
 
 	return resource;
@@ -362,26 +364,40 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 #pragma endregion
 
 //===========================================
-// UplodeTextureData関数(データを転送する関数)
+// UploadTextureData関数(データを転送する関数)
 //===========================================
 
-#pragma region UplodeTextureData関数(データを転送する関数)
+#pragma region UploadTextureData関数(データを転送する関数)
 
-void UplodeTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages) {
+[[nodiscard]] ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) {
 
-	// Meta情報を取得
-	const DirectX::TexMetadata& metaData = mipImages.GetMetadata();
+	// 中間リソース
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 
-	// 全MipMapについて
-	for (size_t mipLevel = 0; mipLevel < metaData.mipLevels; mipLevel++) {
+	// PrepareUploadを利用して、読み込んだデータからDirectX12用のSubresourceの配列を作成する
+	DirectX::PrepareUpload(device, mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
 
-		// MipMapLevelを指定して各Imageを取得
-		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
+	// Subresourceの数を基に、コピー元となるintermediateResourceに必要なサイズを計算する
+	uint64_t intermediateSize = GetRequiredIntermediateSize(texture, 0, UINT(subresources.size()));
 
-		// Textureに転送
-		HRESULT hr = texture->WriteToSubresource(UINT(mipLevel), nullptr, img->pixels, UINT(img->rowPitch), UINT(img->slicePitch));
-		assert(SUCCEEDED(hr));
-	}
+	// 計算したサイズでintermediateResourceを作成する
+	ID3D12Resource* intermediateResource = CreateBufferResource(device, intermediateSize);
+
+	// データ転送をコマンドに積む
+	UpdateSubresources(commandList, texture, intermediateResource, 0, 0, UINT(subresources.size()), subresources.data());
+
+	// intermediateResourceを返す
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = texture;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
+
+	commandList->ResourceBarrier(1, &barrier);
+	return intermediateResource;
+
 }
 
 #pragma endregion
@@ -1216,8 +1232,44 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 
-	// データ転送
-	UplodeTextureData(textureResource, mipImages);
+	//===========================
+	// コマンドを実行して完了を待つ
+	//===========================
+
+#pragma region コマンドを実行して完了を待つ
+
+	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
+	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+
+	// CommandListをCloseし、commandQueue->ExecuteCommandListsを使いキックする
+	hr = commandList->Close();
+	assert(SUCCEEDED(hr));
+
+	ID3D12CommandList* initCommandLists[] = { commandList };
+	commandQueue->ExecuteCommandLists(1, initCommandLists);
+
+	// GPU側の実行が完了するのをフェンスを使って待つ
+	fenceValue++;
+	hr = commandQueue->Signal(fence, fenceValue);
+	assert(SUCCEEDED(hr));
+
+	if (fence->GetCompletedValue() < fenceValue) {
+		fence->SetEventOnCompletion(fenceValue, fenceEvent);
+		WaitForSingleObject(fenceEvent, INFINITE);
+	}
+
+	// 実行が完了したので、allocatorとcommandListをResetして次のコマンドを積めるようにする
+	hr = commandAllocator->Reset();
+	assert(SUCCEEDED(hr));
+
+	hr = commandList->Reset(commandAllocator, nullptr);
+	assert(SUCCEEDED(hr));
+
+	// 転送が終わったので、不要になった中間リソースとCPUメモリを安全に解放する
+	intermediateResource->Release();
+	mipImages.Release();
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1234,7 +1286,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 2Dテクスチャ
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+
+	// テクスチャリソースが持っているすべてのミップマップレベルを自動的にすべて割り当てる(符号なし整数の最大値を直接表す「0xFFFFFFFF」に書き換える)
+	srvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
 
 	// SRVを作成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -1530,8 +1584,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	if (swapChainResources[0]) { swapChainResources[0]->Release(); }
 	if (swapChainResources[1]) { swapChainResources[1]->Release(); }
 	swapChain->Release();
-
-	mipImages.Release();
 
 	// コマンド関連・デバイスの解放
 	commandList->Release();
