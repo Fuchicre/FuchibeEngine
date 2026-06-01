@@ -458,7 +458,7 @@ ID3D12Resource* CreateDepthStencilTexture(ID3D12Device* device, int32_t width, i
 	assert(SUCCEEDED(hr));
 
 	return resource;
-	
+
 }
 
 #pragma endregion
@@ -1193,6 +1193,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 頂点リソースの生成
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
 
+	// Sprite用の頂点リソースを作成する
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
+
 #pragma endregion
 
 	//=========================
@@ -1233,6 +1236,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 単位行列を書き込んでおく
 	*wvpData = MathUtils::MakeIdentity4x4();
 
+	// Sprite用のTransformMatrixResourceも作成する(Matrix4x4 1つ分のサイズを用意する)
+	ID3D12Resource* transformMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	// データを書き込む
+	Matrix4x4* transformMatrixDataSprite = nullptr;
+
+	// 書き込むためのアドレスを取得
+	transformMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformMatrixDataSprite));
+
+	// 単位行列を書き込んでおく
+	*transformMatrixDataSprite = MathUtils::MakeIdentity4x4();
+
 #pragma endregion
 
 	//===========================
@@ -1252,6 +1267,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	// Sprite用の頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+
+	// リソースの先頭アドレスから使う
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+
+	// 使用するリソースのサイズは頂点6つ分のサイズ
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+
+	// 1頂点あたりのサイズ
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 #pragma endregion
 
@@ -1295,6 +1322,44 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
 	vertexData[5].texcoord = { 1.0f, 1.0f };
 
+	// Sprite用の頂点データも書き込む //
+	VertexData* vertexDataSprite = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+
+	// 幅 640、高さ 360 の矩形を左上原点(0,0)基準で作成
+	float w = 640.0f;
+	float h = 360.0f;
+
+	// 1枚目の三角形 //
+
+	// 左下
+	vertexDataSprite[0].position = { 0.0f, h, 0.0f, 1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f, 1.0f };
+
+	// 左上
+	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[1].texcoord = { 0.0f, 0.0f };
+
+	// 右下
+	vertexDataSprite[2].position = { w, h, 0.0f, 1.0f };
+	vertexDataSprite[2].texcoord = { 1.0f, 1.0f };
+
+	// 2枚目の三角形 //
+
+	// 左上
+	vertexDataSprite[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[3].texcoord = { 0.0f, 0.0f };
+
+	// 右上
+	vertexDataSprite[4].position = { w, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[4].texcoord = { 1.0f, 0.0f };
+
+	// 右下
+	vertexDataSprite[5].position = { w, h, 0.0f, 1.0f };
+	vertexDataSprite[5].texcoord = { 1.0f, 1.0f };
+
 #pragma endregion
 
 	//==================================
@@ -1331,7 +1396,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region Transform変数の作成
 
+	// 三角形用のTransformを作成する
 	Transform transform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f} };
+
+	// Sprite用のTransformを作成する
+	Transform transformSprite{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f} };
 
 #pragma endregion
 
@@ -1437,6 +1506,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+
+	//============================
+	// スプライトの位置を保持する変数
+	//============================
+
+#pragma region スプライトの位置を保持する変数
+
+	// スプライトの位置(X, Y) 初期値は(0, 0)
+	float spritePos[2] = { 0.0f, 0.0f };
+
+#pragma endregion
+
 	//=====================
 	// メインループ
 	//=====================
@@ -1484,6 +1565,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::ColorPicker4("Color Selector", &materialData->x, flags);
 
 			ImGui::End();
+
+			ImGui::Begin("Sprite Settings");
+
+			// XとYの座標のみを動かせるスライダー(画面サイズ内で制限)
+			ImGui::SliderFloat2("Position", spritePos, 0.0f, static_cast<float>(kClientWidth));
+
+			ImGui::End();
 #endif
 
 			Transform cameraTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
@@ -1507,6 +1595,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// CBufferの中身を更新
 			*wvpData = worldViewProjectionMatrix;
+
+			// Sprite用のWorldViewProjectionMatrixを作成する //
+
+			// ImGuiからの入力をTranslateのX, Yにのみ反映。Zは0.0f固定
+			transformSprite.translate.x = spritePos[0];
+			transformSprite.translate.y = spritePos[1];
+
+			// 奥行きは固定
+			transformSprite.translate.z = 0.0f;
+
+			Matrix4x4 worldMatrixSprite = MathUtils::MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+
+			Matrix4x4 viewMatrixSprite = MathUtils::MakeIdentity4x4();
+
+			Matrix4x4 projectionMatrixSprite = MathUtils::MakeOrthographicMatrix(0.0f, 0.0f, static_cast<float>(kClientWidth), static_cast<float>(kClientHeight), 0.0f, 100.0f);
+
+			Matrix4x4 worldViewProjectionMatrixSprite = MathUtils::Multiply(worldMatrixSprite, MathUtils::Multiply(viewMatrixSprite, projectionMatrixSprite));
+
+			// Sprite用のCBufferの中身を更新する
+			*transformMatrixDataSprite = worldViewProjectionMatrixSprite;
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -1580,22 +1688,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// PSOを設定する
 			commandList->SetPipelineState(graphicsPipelineState);
 
-			// VBVを設定する
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-
 			// トポロジ(形状)を設定する。PSOに設定しているものとはまた別。同じものを設定すると考えておくといい
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			// CBVを設定する(マテリアルCBufferの場所を設定)
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-			// WVP用のCBVを設定する
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-
 			// SRVのDescriptorTableの先頭を設定。2はrootParameters[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			// 描画コマンド!(DrawCall)頂点5つで2つのインスタンス
+			// ==========================================
+			// 三角形(3D)の描画設定
+			// ==========================================
+
+			// 三角形用のVBVを設定
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+
+			// 三角形用のWVP行列CBVを設定
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+
+			// 三角形の描画コマンド!(DrawCall)
+			commandList->DrawInstanced(6, 1, 0, 0);
+
+
+			// ==========================================
+			// Sprite(2D)の描画設定
+			// ==========================================
+
+			// Sprite用のVBVを設定(これで三角形のVBVが上書きされる)
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+
+			// Sprite用のWVP行列CBVを設定(これで三角形のCBVが上書きされる)
+			commandList->SetGraphicsRootConstantBufferView(1, transformMatrixResourceSprite->GetGPUVirtualAddress());
+
+			// Spriteの描画コマンド!!(DrawCall)
 			commandList->DrawInstanced(6, 1, 0, 0);
 
 			// 実際のcommandListのImGui描画コマンドを積む

@@ -43,11 +43,11 @@ Matrix4x4 MathUtils::MakeRotateXMatrix(float theta) {
 
 	result.m[1][0] = 0.0f;
 	result.m[1][1] = cosf(theta);
-	result.m[1][2] = -sinf(theta);
+	result.m[1][2] = sinf(theta);
 	result.m[1][3] = 0.0f;
 
 	result.m[2][0] = 0.0f;
-	result.m[2][1] = sinf(theta);
+	result.m[2][1] = -sinf(theta);
 	result.m[2][2] = cosf(theta);
 	result.m[2][3] = 0.0f;
 
@@ -67,7 +67,7 @@ Matrix4x4 MathUtils::MakeRotateYMatrix(float theta) {
 
 	result.m[0][0] = cosf(theta);
 	result.m[0][1] = 0.0f;
-	result.m[0][2] = sinf(theta);
+	result.m[0][2] = -sinf(theta);
 	result.m[0][3] = 0.0f;
 
 	result.m[1][0] = 0.0f;
@@ -75,7 +75,7 @@ Matrix4x4 MathUtils::MakeRotateYMatrix(float theta) {
 	result.m[1][2] = 0.0f;
 	result.m[1][3] = 0.0f;
 
-	result.m[2][0] = -sinf(theta);
+	result.m[2][0] = sinf(theta);
 	result.m[2][1] = 0.0f;
 	result.m[2][2] = cosf(theta);
 	result.m[2][3] = 0.0f;
