@@ -1190,8 +1190,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexResourceの生成
 
-	// 頂点リソースの生成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
+	// 球体の分割数に合わせたサイズ
+	const uint32_t kSubdivision = 16;
+
+	// 1536個
+	uint32_t vertexCount = kSubdivision * kSubdivision * 6;
+	size_t sizeInBytes = sizeof(VertexData) * vertexCount;
+
+	// 球の頂点リソースの生成
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeInBytes);
 
 	// Sprite用の頂点リソースを作成する
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -1262,8 +1269,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソースの先頭アドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 
-	// 使用するリソースのサイズは頂点3つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
+	// 使用するリソースのサイズは頂点1536個分のサイズ
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * (kSubdivision * kSubdivision * 6);
 
 	// 1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -1294,33 +1301,57 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 書き込むためのアドレスを取得する
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	// 1枚目の三角形 //
+	// === 球体の設定 ===
 
-	// 左下1
-	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[0].texcoord = { 0.0f, 1.0f };
+	// 経度分割1つ分の角度(全周 2π を 分割数 で割る)
+	const float kLonEvery = (2.0f * static_cast<float>(M_PI)) / static_cast<float>(kSubdivision);
 
-	// 上1
-	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
-	vertexData[1].texcoord = { 0.5f, 0.0f };
+	// 緯度分割1つ分の角度(半周 π を 分割数 で割る)
+	const float kLatEvery = static_cast<float>(M_PI) / static_cast<float>(kSubdivision);
 
-	// 右下1
-	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[2].texcoord = { 1.0f, 1.0f };
+	// 緯度の方向に分割
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; latIndex++) {
 
-	// 2枚目の三角形 //
+		// 現在の緯度 lat と、次の緯度 latNext
+		// 範囲を -π/2 〜 π/2 にするための計算
+		float lat = -static_cast<float>(M_PI) / 2.0f + kLatEvery * latIndex;
+		float latNext = lat + kLatEvery;
 
-	// 左下2
-	vertexData[3].position = { -0.5f, -0.5f, 0.5f, 1.0f };
-	vertexData[3].texcoord = { 0.0f, 1.0f };
+		// 経度の方向に分割
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; lonIndex++) {
 
-	// 上2
-	vertexData[4].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexData[4].texcoord = { 0.5f, 0.0f };
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
 
-	// 右下2
-	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
-	vertexData[5].texcoord = { 1.0f, 1.0f };
+			// 現在の経度 lon と、次の経度 lonNext
+			float lon = lonIndex * kLonEvery;
+			float lonNext = lon + kLonEvery;
+
+			// 4つの角の球面上座標をあらかじめ計算する
+			// p0: 左下 p1: 左上 p2: 右下 p3: 右上
+			Vector4 p0 = { cosf(lat) * cosf(lon),         sinf(lat),     cosf(lat) * sinf(lon),     1.0f };
+			Vector4 p1 = { cosf(latNext) * cosf(lon),     sinf(latNext), cosf(latNext) * sinf(lon), 1.0f };
+			Vector4 p2 = { cosf(lat) * cosf(lonNext),     sinf(lat),     cosf(lat) * sinf(lonNext), 1.0f };
+			Vector4 p3 = { cosf(latNext) * cosf(lonNext), sinf(latNext), cosf(latNext) * sinf(lonNext), 1.0f };
+
+			// テクスチャ座標(UV)も同様に4点分計算
+			Vector2 u0 = { static_cast<float>(lonIndex) / kSubdivision,     1.0f - static_cast<float>(latIndex) / kSubdivision };
+			Vector2 u1 = { static_cast<float>(lonIndex) / kSubdivision,     1.0f - static_cast<float>(latIndex + 1) / kSubdivision };
+			Vector2 u2 = { static_cast<float>(lonIndex + 1) / kSubdivision, 1.0f - static_cast<float>(latIndex) / kSubdivision };
+			Vector2 u3 = { static_cast<float>(lonIndex + 1) / kSubdivision, 1.0f - static_cast<float>(latIndex + 1) / kSubdivision };
+
+			// 6つの頂点データへの書き込み(時計回り)
+
+			// 1枚目の三角形(p0 -> p1 -> p2)
+			vertexData[start + 0].position = p0; vertexData[start + 0].texcoord = u0;
+			vertexData[start + 1].position = p1; vertexData[start + 1].texcoord = u1;
+			vertexData[start + 2].position = p2; vertexData[start + 2].texcoord = u2;
+
+			// 2枚目の三角形(p1 -> p3 -> p2)
+			vertexData[start + 3].position = p1; vertexData[start + 3].texcoord = u1;
+			vertexData[start + 4].position = p3; vertexData[start + 4].texcoord = u3;
+			vertexData[start + 5].position = p2; vertexData[start + 5].texcoord = u2;
+		}
+	}
 
 	// Sprite用の頂点データも書き込む //
 	VertexData* vertexDataSprite = nullptr;
@@ -1506,7 +1537,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-
 	//============================
 	// スプライトの位置を保持する変数
 	//============================
@@ -1515,6 +1545,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// スプライトの位置(X, Y) 初期値は(0, 0)
 	float spritePos[2] = { 0.0f, 0.0f };
+
+	// カメラのTransform(Zの初期値を -10.0f に設定)
+	Transform cameraTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
 #pragma endregion
 
@@ -1572,9 +1605,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::SliderFloat2("Position", spritePos, 0.0f, static_cast<float>(kClientWidth));
 
 			ImGui::End();
-#endif
 
-			Transform cameraTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
+			// 球のカメラを操作するためのImGui
+			ImGui::Begin("Camera Settings");
+
+			// カメラの位置を動かせるスライダー
+			ImGui::SliderFloat3("Camera Position", &cameraTransform.translate.x, -20.0f, 10.0f);
+
+			// カメラの回転を動かせるスライダー
+			ImGui::SliderFloat3("Camera Rotation", &cameraTransform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+			ImGui::End();
+#endif
 
 			// Transformの更新
 			transform.rotate.y += 0.03f;
@@ -1697,9 +1738,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// SRVのDescriptorTableの先頭を設定。2はrootParameters[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			// ==========================================
+			//==========================================
 			// 三角形(3D)の描画設定
-			// ==========================================
+			//==========================================
 
 			// 三角形用のVBVを設定
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -1707,13 +1748,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 三角形用のWVP行列CBVを設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
-			// 三角形の描画コマンド!(DrawCall)
-			commandList->DrawInstanced(6, 1, 0, 0);
+			// 球の描画コマンド(16 * 16 * 6 = 1536)DrawCall
+			uint32_t totalSphereVertices = kSubdivision * kSubdivision * 6;
+			commandList->DrawInstanced(totalSphereVertices, 1, 0, 0);
 
-
-			// ==========================================
+			//==========================================
 			// Sprite(2D)の描画設定
-			// ==========================================
+			//==========================================
 
 			// Sprite用のVBVを設定(これで三角形のVBVが上書きされる)
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);

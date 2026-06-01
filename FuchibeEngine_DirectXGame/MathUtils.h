@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#define _USE_MATH_DEFINES
 
 // 4x4行列
 struct Matrix4x4 {
