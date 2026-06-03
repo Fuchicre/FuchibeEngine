@@ -1907,7 +1907,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					ImGui::Text("--- Visual Direction Settings ---");
 
 					// 演出全体の速度変更スライダー
-					ImGui::DragFloat("Effect Speed", &effectSpeed, 0.05f, 0.0f, 5.0f, "%.2f");
+					ImGui::DragFloat("Effect Speed", &effectSpeed, 0.05f, 0.0f, 30.0f, "%.2f");
 					ImGui::Separator();
 
 					// 5モード対応ブレンドモードコンボボックス
