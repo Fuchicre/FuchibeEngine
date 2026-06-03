@@ -16,6 +16,7 @@
 #include "externals/DirectXTex/DirectXTex.h"
 #include "externals/DirectXTex/d3dx12.h"
 #include <vector>
+#include "Easing.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -150,7 +151,12 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
+//===========================
 // BufferResourceの作成関数
+//===========================
+
+#pragma region BufferResourceの作成関数
+
 ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 
 	// 頂点リソース用のヒープの設定
@@ -184,6 +190,8 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 	return bufferResource;
 
 }
+
+#pragma endregion
 
 //===========================
 // DescriptorHeapの作成関数
@@ -947,10 +955,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
 
-#pragma endregion
-
 	// ループに入る前に1回出す
 	Log(logStream, "Game Engine Started.");
+
+#pragma endregion
 
 	//======================
 	// FenceとEventの生成
@@ -1238,6 +1246,113 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = device->CreateGraphicsPipelineState(&graphicsPilelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
+	//================
+	// 演出専用の変数
+	//================
+
+	// 演出用ピクセルシェーダーバイナリ
+	IDxcBlob* effectPixelShaderBlob = nullptr;
+
+	// ブレンドモードの種類を定義する列挙型
+	enum EffectBlendMode {
+		// ブレンドなし
+		BlendMode_None,
+		// 通常半透明
+		BlendMode_Alpha,
+		// 加算合成
+		BlendMode_Add,
+		// 減算合成
+		BlendMode_Subtract,
+		// スクリーン合成
+		BlendMode_Screen,
+		// 総数
+		BlendMode_Count
+	};
+
+	// 現在選択されているブレンドモード(初期状態はNone)
+	int currentBlendIndex = BlendMode_None;
+
+	// 初期値は0:Linear(イージングなし)
+	int currentEasingType = 0;
+
+	// 演出用パイプライン状態オブジェクトを配列で管理する
+	ID3D12PipelineState* effectPipelineStates[BlendMode_Count] = { nullptr };
+
+	//============================================
+	// 演出専用ピクセルシェーダーのコンパイルとPSOの生成
+	//============================================
+
+	// 提示されたCompileShaderのルールに合わせて呼び出し
+	effectPixelShaderBlob = CompileShader(L"Effect3D.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, dxcIncludeHandler);
+	assert(effectPixelShaderBlob != nullptr);
+
+	// 通常のDescをベースにして演出用Descを作成する
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC effectPipelineStateDesc = graphicsPilelineStateDesc;
+
+	// ピクセルシェーダーのみ演出用のBlobに差し替える
+	effectPipelineStateDesc.PS = { effectPixelShaderBlob->GetBufferPointer(), effectPixelShaderBlob->GetBufferSize() };
+
+	// 演出用はすべて共通で深度バッファの書き込みを禁止にする(半透明の重なりを綺麗にするため)
+	effectPipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	effectPipelineStateDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+	// 【None:ブレンドなし】用のPSOの生成
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = false;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	hr = device->CreateGraphicsPipelineState(&effectPipelineStateDesc, IID_PPV_ARGS(&effectPipelineStates[BlendMode_None]));
+	assert(SUCCEEDED(hr));
+
+	// 【Alpha:通常半透明(アルファブレンド)】用のPSOの生成
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = true;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+	hr = device->CreateGraphicsPipelineState(&effectPipelineStateDesc, IID_PPV_ARGS(&effectPipelineStates[BlendMode_Alpha]));
+	assert(SUCCEEDED(hr));
+
+
+	// 【Add:加算合成】用のPSOの生成
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = true;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+	hr = device->CreateGraphicsPipelineState(&effectPipelineStateDesc, IID_PPV_ARGS(&effectPipelineStates[BlendMode_Add]));
+	assert(SUCCEEDED(hr));
+
+	// 【Subtract:減算合成】用のPSOの生成
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = true;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+	hr = device->CreateGraphicsPipelineState(&effectPipelineStateDesc, IID_PPV_ARGS(&effectPipelineStates[BlendMode_Subtract]));
+	assert(SUCCEEDED(hr));
+
+	// 【Screen:スクリーン合成】用のPSOの生成
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = true;
+
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	effectPipelineStateDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+	hr = device->CreateGraphicsPipelineState(&effectPipelineStateDesc, IID_PPV_ARGS(&effectPipelineStates[BlendMode_Screen]));
+	assert(SUCCEEDED(hr));
+
 #pragma endregion
 
 	//=======================
@@ -1288,6 +1403,33 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Matrix4x4* wvpData2 = nullptr;
 	wvpResource2->Map(0, nullptr, reinterpret_cast<void**>(&wvpData2));
 	*wvpData2 = MathUtils::MakeIdentity4x4();
+
+	// 演出用の三角形の数
+	const int kMaxEffectObjects = 100;
+
+	// 演出用のSRTデータを保持する配列
+	Transform effectTransforms[kMaxEffectObjects];
+	for (int i = 0; i < kMaxEffectObjects; i++) {
+		effectTransforms[i].scale = { 1.0f, 1.0f, 1.0f };
+		effectTransforms[i].rotate = { 0.0f, 0.0f, 0.0f };
+		effectTransforms[i].translate = { -1.5f + i * 1.5f, 0.0f, 0.0f };
+	}
+
+	// 演出用のリソースとデータポインタの配列
+	ID3D12Resource* effectWvpResources[kMaxEffectObjects] = { nullptr };
+	Matrix4x4* effectWvpData[kMaxEffectObjects] = { nullptr };
+
+	// タイマー変数
+	float effectTimer = 0.0f;
+
+	// 演出用の最大数分、定数バッファを作成するループ
+	for (int i = 0; i < kMaxEffectObjects; i++) {
+
+		effectWvpResources[i] = CreateBufferResource(device, sizeof(Matrix4x4));
+
+		// 作成したリソースをMapして、いつでもCPUからデータを書き込めるようにする
+		effectWvpResources[i]->Map(0, nullptr, reinterpret_cast<void**>(&effectWvpData[i]));
+	}
 
 #pragma endregion
 
@@ -1546,6 +1688,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//=================
+	// 映像演出用の変数
+	//=================
+
+#pragma region 映像演出用の変数
+
+	// 映像演出の切り替え用フラグ(初期値はOFF)
+	bool isVisualDirection = false;
+
+	// 共通設定パラメータ //
+
+	// アニメーション速度(倍率)
+	float effectSpeed = 1.0f;
+
+	// 演出用の単色カラー(RGBA)
+	Vector4 effectColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+	// 演出用三角形全体のベースSRT(ImGui操作用)
+	Transform effectBaseTransform{ {0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+#pragma endregion
+
 	//=====================
 	// メインループ
 	//=====================
@@ -1578,11 +1742,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ゲームの処理
 
-// 開発用UIの処理。実際に開発用のUIを出す場合は、ここをゲーム固有の処理に置き換える
+// 開発用UIの処理
 #ifdef USE_IMGUI
 
 			// 一番外枠のウィンドウ「Settings」を開始する
 			if (ImGui::Begin("Settings")) {
+
+				//===========================================================
+				// 【映像演出の切り替え】
+				//===========================================================
+
+				// チェックボックスを表示し、isVisualDirectionの値を直接書き換える
+				ImGui::Checkbox("Visual Direction", &isVisualDirection);
 
 				// 共通で表示するためのテクスチャパスの配列
 				const char* texturePaths[] = {
@@ -1590,91 +1761,233 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					"resources/monsterBall.png"
 				};
 
-				//=================================================================
-				// 【1枚目の三角形の設定項目(TransformとDeleteのみ)】
-				//=================================================================
+				//======映像演出がOFFの時=======//
+				if (!isVisualDirection) {
 
-				if (isAlive1) {
+					//=================================================================
+					// 【1枚目の三角形の設定項目(TransformとDelete/Reset)】
+					//=================================================================
 
-					// 「▼ Object1」ヘッダーを作成する
-					if (ImGui::CollapsingHeader("Object##1", ImGuiTreeNodeFlags_DefaultOpen)) {
+					if (isAlive1) {
 
-						// 1枚目用の SRT 操作
-						ImGui::DragFloat3("Translate##1", &transform1.translate.x, 0.01f);
-						ImGui::DragFloat3("Rotate##1", &transform1.rotate.x, 0.01f);
-						ImGui::DragFloat3("Scale##1", &transform1.scale.x, 0.01f);
+						// 「▼ Object1」ヘッダーを作成する
+						if (ImGui::CollapsingHeader("Object##1", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-						// 1枚目の Delete ボタン
-						if (ImGui::Button("Delete##1")) {
-							isAlive1 = false;
-						}
-					}
-				}
+							// 1枚目用のSRT操作
+							ImGui::DragFloat3("Translate##1", &transform1.translate.x, 0.01f);
+							ImGui::DragFloat3("Rotate##1", &transform1.rotate.x, 0.01f);
+							ImGui::DragFloat3("Scale##1", &transform1.scale.x, 0.01f);
 
-				//=================================================================
-				// 【2枚目の三角形の設定項目(TransformとDeleteのみ)】
-				//=================================================================
-
-				if (isAlive2) {
-
-					// 「▼ Object2」ヘッダーを作成する
-					if (ImGui::CollapsingHeader("Object##2", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-						// 2枚目用の SRT 操作
-						ImGui::DragFloat3("Translate##2", &transform2.translate.x, 0.01f);
-						ImGui::DragFloat3("Rotate##2", &transform2.rotate.x, 0.01f);
-						ImGui::DragFloat3("Scale##2", &transform2.scale.x, 0.01f);
-
-						// 2枚目の Delete ボタン
-						if (ImGui::Button("Delete##2")) {
-							isAlive2 = false;
-						}
-					}
-				}
-
-				// =================================================================
-				// 【共通マテリアル＆テクスチャの設定】
-				// =================================================================
-
-				if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-					// 共通のマテリアルカラーデータを編集
-					ImGuiColorEditFlags flags =
-						ImGuiColorEditFlags_AlphaBar |
-						ImGuiColorEditFlags_PickerHueBar |
-						ImGuiColorEditFlags_DisplayRGB |
-						ImGuiColorEditFlags_DisplayHex;
-
-					ImGui::ColorPicker4("color", &materialData->x, flags);
-
-					// インデックスが配列範囲(0 ~ 1)に収まるよう強制チェック
-					if (textureIndex1 < 0 || textureIndex1 >= 2) {
-						textureIndex1 = 0;
-					}
-
-					// 2枚目の三角形も範囲外なら0に戻す
-					if (textureIndex2 < 0 || textureIndex2 >= 2) {
-						textureIndex2 = 0;
-					}
-
-					// 唯一の共通テクスチャ切り替えコンボボックス
-					if (ImGui::BeginCombo("Texture", texturePaths[textureIndex1])) {
-
-						for (int i = 0; i < 2; i++) {
-
-							bool isSelected = (textureIndex1 == i);
-
-							if (ImGui::Selectable(texturePaths[i], isSelected)) {
-								textureIndex1 = i;
-								textureIndex2 = i;
+							// 1枚目のDeleteボタン
+							if (ImGui::Button("Delete##1")) {
+								isAlive1 = false;
 							}
 
+							// 生存時のResetボタン
+							ImGui::SameLine();
+							if (ImGui::Button("Reset##1")) {
+								transform1.scale = { 1.0f, 1.0f, 1.0f };
+								transform1.rotate = { 0.0f, 0.0f, 0.0f };
+								transform1.translate = { 0.0f, 0.0f, 0.0f };
+							}
+						}
+					}
+					else {
+						// 消えている時のResetボタン
+						ImGui::Text("Object1 is Deleted.");
+						ImGui::SameLine();
+						if (ImGui::Button("Reset Object1")) {
+							isAlive1 = true;
+							transform1.scale = { 1.0f, 1.0f, 1.0f };
+							transform1.rotate = { 0.0f, 0.0f, 0.0f };
+							transform1.translate = { 0.0f, 0.0f, 0.0f };
+						}
+						ImGui::Separator();
+					}
+
+					//=================================================================
+					// 【2枚目の三角形の設定項目(TransformとDelete/Reset)】
+					//=================================================================
+
+					if (isAlive2) {
+
+						// 「▼ Object2」ヘッダーを作成する
+						if (ImGui::CollapsingHeader("Object##2", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+							// 2枚目用のSRT操作
+							ImGui::DragFloat3("Translate##2", &transform2.translate.x, 0.01f);
+							ImGui::DragFloat3("Rotate##2", &transform2.rotate.x, 0.01f);
+							ImGui::DragFloat3("Scale##2", &transform2.scale.x, 0.01f);
+
+							// 2枚目のDeleteボタン
+							if (ImGui::Button("Delete##2")) {
+								isAlive2 = false;
+							}
+
+							// 生存時のResetボタン
+							ImGui::SameLine();
+							if (ImGui::Button("Reset##2")) {
+								transform2.scale = { 1.0f, 1.0f, 1.0f };
+								transform2.rotate = { 0.0f, 0.0f, 0.0f };
+								transform2.translate = { 0.0f, 0.0f, 0.0f };
+							}
+						}
+					}
+					else {
+						// 消えている時のResetボタン
+						ImGui::Text("Object2 is Deleted.");
+						ImGui::SameLine();
+						if (ImGui::Button("Reset Object2")) {
+							isAlive2 = true;
+							transform2.scale = { 1.0f, 1.0f, 1.0f };
+							transform2.rotate = { 0.0f, 0.0f, 0.0f };
+							transform2.translate = { 0.0f, 0.0f, 0.0f };
+						}
+						ImGui::Separator();
+					}
+
+					//=================================================================
+					// 【共通マテリアル＆テクスチャの設定】
+					//=================================================================
+
+					if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+						// 共通のマテリアルカラーデータを編集
+						ImGuiColorEditFlags flags =
+							ImGuiColorEditFlags_AlphaBar |
+							ImGuiColorEditFlags_PickerHueBar |
+							ImGuiColorEditFlags_DisplayRGB |
+							ImGuiColorEditFlags_DisplayHex;
+
+						ImGui::ColorPicker4("color", &materialData->x, flags);
+
+						// インデックスが配列範囲(0 ~ 1)に収まるよう強制チェック
+						if (textureIndex1 < 0 || textureIndex1 >= 2) {
+							textureIndex1 = 0;
+						}
+
+						// 2枚目の三角形も範囲外なら0に戻す
+						if (textureIndex2 < 0 || textureIndex2 >= 2) {
+							textureIndex2 = 0;
+						}
+
+						// 共通テクスチャの切り替えコンボボックス
+						if (ImGui::BeginCombo("Texture", texturePaths[textureIndex1])) {
+
+							for (int i = 0; i < 2; i++) {
+
+								bool isSelected = (textureIndex1 == i);
+
+								if (ImGui::Selectable(texturePaths[i], isSelected)) {
+									textureIndex1 = i;
+									textureIndex2 = i;
+								}
+
+								if (isSelected) {
+									ImGui::SetItemDefaultFocus();
+								}
+							}
+							ImGui::EndCombo();
+						}
+
+						// マテリアル用の一発リセットボタン
+						if (ImGui::Button("Reset Material & Texture")) {
+							*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+							textureIndex1 = 0;
+							textureIndex2 = 0;
+						}
+					}
+				}
+				else {
+
+					//=================================================================
+					// Visual DirectionがONの時のみ演出用の詳細UIを出す
+					//=================================================================
+
+					ImGui::Text("--- Visual Direction Settings ---");
+
+					// 演出全体の速度変更スライダー
+					ImGui::DragFloat("Effect Speed", &effectSpeed, 0.05f, 0.0f, 5.0f, "%.2f");
+					ImGui::Separator();
+
+					// 5モード対応ブレンドモードコンボボックス
+					const char* blendNames[] = {
+						"None",
+						"Alpha",
+						"Add",
+						"Subtract",
+						"Screen"
+					};
+
+					if (ImGui::BeginCombo("Blend Mode", blendNames[currentBlendIndex])) {
+						for (int i = 0; i < BlendMode_Count; i++) {
+							bool isSelected = (currentBlendIndex == i);
+							if (ImGui::Selectable(blendNames[i], isSelected)) {
+								currentBlendIndex = i;
+							}
 							if (isSelected) {
 								ImGui::SetItemDefaultFocus();
 							}
 						}
 						ImGui::EndCombo();
 					}
+
+					ImGui::Separator();
+
+					// イージングコンボボックス(初期値Linear)
+					const char* easingNames[] = {
+						// 0: イージングなし
+						"Linear(No Easing)",
+						// 1
+						"Ease In",
+						// 2
+						"Ease Out",
+						// 3
+						"Ease In Out",
+						// 4
+						"Ease In Back",
+						// 5
+						"Ease Out Back",
+						// 6
+						"Ease In Quart",
+						// 7
+						"Ease Out Quart",
+						// 8
+						"Ease In Out Quart"
+					};
+
+					if (ImGui::BeginCombo("Easing Type", easingNames[currentEasingType])) {
+						for (int i = 0; i < 9; i++) {
+							bool isSelected = (currentEasingType == i);
+							if (ImGui::Selectable(easingNames[i], isSelected)) {
+								currentEasingType = i;
+							}
+							if (isSelected) {
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+
+					ImGui::Separator();
+
+					// 演出オブジェクト全体のベースSRT操作UI
+					if (ImGui::CollapsingHeader("Effect Base SRT", ImGuiTreeNodeFlags_DefaultOpen)) {
+						ImGui::DragFloat3("Base Scale", &effectBaseTransform.scale.x, 0.01f);
+						ImGui::DragFloat3("Base Rotate", &effectBaseTransform.rotate.x, 0.01f);
+						ImGui::DragFloat3("Base Translate", &effectBaseTransform.translate.x, 0.01f);
+					}
+					ImGui::Separator();
+
+					// 演出専用の大型カラーピッカー
+					ImGui::Text("Effect Material Color");
+					ImGuiColorEditFlags effectFlags =
+						ImGuiColorEditFlags_AlphaBar |
+						ImGuiColorEditFlags_PickerHueBar |
+						ImGuiColorEditFlags_DisplayRGB |
+						ImGuiColorEditFlags_DisplayHex;
+
+					ImGui::ColorPicker4("Effect Color", &effectColor.x, effectFlags);
 				}
 
 				// 一番外枠のウィンドウ「Settings」を終了する
@@ -1689,6 +2002,137 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 透視投影行列の作成
 			Matrix4x4 projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
+
+			//======================================
+			// 映像演出の自動SRT計算&データ書き込み
+			//======================================
+
+			if (isVisualDirection) {
+
+				// タイマーの進み幅(effectSpeedで制御)
+				effectTimer += 0.02f * effectSpeed;
+
+				// ImGuiからのベースSRT(全体の拡大率・回転・位置)からベース行列を作成
+				Matrix4x4 baseMatrix = MathUtils::MakeAffineMatrix(
+					effectBaseTransform.scale,
+					effectBaseTransform.rotate,
+					effectBaseTransform.translate
+				);
+
+				for (int i = 0; i < kMaxEffectObjects; i++) {
+					Transform localTransform;
+
+					// 三角形1つ1つの大きさ
+					localTransform.scale = { 1.0f, 1.0f, 1.0f };
+
+					// 渦の一部として自然に見えるよう、三角形の向きを進行方向に合わせる(接線方向を向かせる)
+
+					// 各オブジェクトの渦の中での位置(角度のズレ)
+					float spiralAngleOffset = static_cast<float>(i) * 0.2f;
+
+					// 現在の合計角度
+					float currentAngle = effectTimer * 2.0f + spiralAngleOffset;
+
+					localTransform.rotate.z = currentAngle;
+					localTransform.rotate.y = 0.0f;
+					localTransform.rotate.x = 0.0f;
+
+					// 渦巻きの座標計算 //
+
+					// まずは時間経過による均等な進捗(0.0f ~ 1.0f)を計算する
+					float rawProgress = std::fmod((effectTimer * 0.15f) + (static_cast<float>(i) / kMaxEffectObjects), 1.0f);
+
+					// 0番なら等速、それ以外なら選択されたイージング関数を動的に適用する
+					float progress = 0.0f;
+
+					switch (currentEasingType) {
+
+						// 0: イージングなし(等速直線運動)
+					case 0:
+						progress = rawProgress;
+						break;
+
+						//---------------------------------------------------------
+						// 1 ~ 3: Sine(正弦波)系イージング(比較的滑らかな変化)
+						//---------------------------------------------------------
+
+					case 1: // Ease In: ゆっくり始まり、だんだん加速する
+						progress = Easing::EaseIn(rawProgress);
+						break;
+
+					case 2: // Ease Out: 勢いよく始まり、だんだん減速する
+						progress = Easing::EaseOut(rawProgress);
+						break;
+
+					case 3: // Ease In Out: ゆっくり始まり、途中で加速し、ゆっくり終わる
+						progress = Easing::EaseInOut(rawProgress);
+						break;
+
+						//---------------------------------------------------------
+						// 4 ~ 5: Back系イージング(一度逆方向にタメたり、行き過ぎたりする)
+						//---------------------------------------------------------
+
+					case 4: // Ease In Back: 一度後ろに少し下がって(タメて)から加速する
+						progress = Easing::EaseInBack(rawProgress);
+						break;
+
+					case 5: // Ease Out Back: 勢いよく飛び出し、目標を少し行き過ぎてから戻る
+						progress = Easing::EaseOutBack(rawProgress);
+						break;
+
+						//---------------------------------------------------------
+						// 6 ~ 8: Quart(4乗)系イージング(Sineよりも非常に強い緩急)
+						//---------------------------------------------------------
+
+					case 6: // Ease In Quart: 始まりが非常に遅く、後半で急激に加速する
+						progress = Easing::EaseInQuart(rawProgress);
+						break;
+
+					case 7: // Ease Out Quart: 最初は爆発的に速く、後半で急激にブレーキがかかる
+						progress = Easing::EaseOutQuart(rawProgress);
+						break;
+
+					case 8: // Ease In Out Quart: 加減速のメリハリが最も強い
+						progress = Easing::EaseInOutQuart(rawProgress);
+						break;
+
+						// 例外処理(安全対策)
+					default:
+						progress = rawProgress;
+						break;
+					}
+
+					// 「緩急のついた progress」を使ってZ軸や半径を計算する //
+
+					// 少し奥の開始位置を深めにするとよりタメが活きます
+					float startZ = 50.0f;
+
+					// カメラ(Z = -5.0)を完全に突き抜ける位置
+					float endZ = -5.0f;
+					localTransform.translate.z = startZ + (endZ - startZ) * progress;
+
+					// 手前に来たときは画面を覆い尽くすぐらい広げる
+					float maxRadius = 12.0f;
+					float radius = progress * maxRadius;
+
+					// 円周上の位置(X座標, Y座標)を計算
+					localTransform.translate.x = std::cos(currentAngle) * radius;
+					localTransform.translate.y = std::sin(currentAngle) * radius;
+
+					// 行列の合成
+					Matrix4x4 localMatrix = MathUtils::MakeAffineMatrix(
+						localTransform.scale,
+						localTransform.rotate,
+						localTransform.translate
+					);
+
+					// 個別行列にベースのSRT行列を乗算することで、ImGuiのSRT操作を有効化
+					Matrix4x4 worldMatrixEff = MathUtils::Multiply(localMatrix, baseMatrix);
+					Matrix4x4 wvpMatrixEff = MathUtils::Multiply(worldMatrixEff, MathUtils::Multiply(viewMatrix, projectionMatrix));
+
+					*effectWvpData[i] = wvpMatrixEff;
+				}
+			}
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -1781,74 +2225,105 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// CBVを設定する(マテリアルCBufferの場所を設定)。rootParameters[0]へ設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-			//==========================================
-			// 1枚目の三角形の描画処理
-			//==========================================
+			// 映像演出がOFFの時のみ描画する2枚の三角形
+			if (!isVisualDirection) {
 
-			if (isAlive1 == true) {
+				//==========================================
+				// 1枚目の三角形の描画処理
+				//==========================================
 
-				// transform1(ImGuiで動く値)からアフィン変換行列を作成
-				Matrix4x4 worldMatrix1 = MathUtils::MakeAffineMatrix(transform1.scale, transform1.rotate, transform1.translate);
+				if (isAlive1 == true) {
 
-				// WVP行列の計算
-				Matrix4x4 wvpMatrix1 = MathUtils::Multiply(worldMatrix1, MathUtils::Multiply(viewMatrix, projectionMatrix));
+					// transform1(ImGuiで動く値)からアフィン変換行列を作成
+					Matrix4x4 worldMatrix1 = MathUtils::MakeAffineMatrix(transform1.scale, transform1.rotate, transform1.translate);
 
-				// 1番用の定数バッファへWVP行列データを書き込む
-				*wvpData1 = wvpMatrix1;
+					// WVP行列の計算
+					Matrix4x4 wvpMatrix1 = MathUtils::Multiply(worldMatrix1, MathUtils::Multiply(viewMatrix, projectionMatrix));
 
-				// 定数バッファのバインド(レジスタ1番)
-				commandList->SetGraphicsRootConstantBufferView(1, wvpResource1->GetGPUVirtualAddress());
+					// 1番用の定数バッファへWVP行列データを書き込む
+					*wvpData1 = wvpMatrix1;
 
-				// 共通コンボボックスの選択に応じてSRVハンドルを切り替える
+					// 定数バッファのバインド(レジスタ1番)
+					commandList->SetGraphicsRootConstantBufferView(1, wvpResource1->GetGPUVirtualAddress());
 
-				// 0番:uvChecker
-				D3D12_GPU_DESCRIPTOR_HANDLE srvHandle1 = textureSrvHandleGPU;
+					// 共通コンボボックスの選択に応じてSRVハンドルを切り替える
 
-				if (textureIndex1 == 1) {
-					// 1番:monsterBall
-					srvHandle1 = textureSrvHandleGPU2;
+					// 0番:uvChecker
+					D3D12_GPU_DESCRIPTOR_HANDLE srvHandle1 = textureSrvHandleGPU;
+
+					if (textureIndex1 == 1) {
+						// 1番:monsterBall
+						srvHandle1 = textureSrvHandleGPU2;
+					}
+
+					// SRVのDescriptorTableを設定(rootParameters[2]の場所)
+					commandList->SetGraphicsRootDescriptorTable(2, srvHandle1);
+
+					// 描画コマンド(1枚目の三角形である頂点インデックス0から3つを描画)
+					commandList->DrawInstanced(3, 1, 0, 0);
 				}
 
-				// SRVのDescriptorTableを設定(rootParameters[2]の場所)
-				commandList->SetGraphicsRootDescriptorTable(2, srvHandle1);
+				//==========================================
+				// 2枚目の三角形の描画処理
+				//==========================================
 
-				// 描画コマンド(1枚目の三角形である頂点インデックス0から3つを描画)
-				commandList->DrawInstanced(3, 1, 0, 0);
+				if (isAlive2 == true) {
+
+					// transform2(ImGuiで動く値)からアフィン変換行列を作成
+					Matrix4x4 worldMatrix2 = MathUtils::MakeAffineMatrix(transform2.scale, transform2.rotate, transform2.translate);
+
+					// WVP行列の計算
+					Matrix4x4 wvpMatrix2 = MathUtils::Multiply(worldMatrix2, MathUtils::Multiply(viewMatrix, projectionMatrix));
+
+					// 2番用の定数バッファへWVP行列データを書き込む
+					*wvpData2 = wvpMatrix2;
+
+					// 定数バッファのバインド(レジスタ1番)
+					commandList->SetGraphicsRootConstantBufferView(1, wvpResource2->GetGPUVirtualAddress());
+
+					// デフォルトを「textureSrvHandleGPU(uvChecker)」に統一し、インデックスが1のときだけ(monsterBall)に切り替える
+
+					// 0番:uvChecker(初期値)
+					D3D12_GPU_DESCRIPTOR_HANDLE srvHandle2 = textureSrvHandleGPU;
+
+					if (textureIndex2 == 1) {
+						// 1番:monsterBall
+						srvHandle2 = textureSrvHandleGPU2;
+					}
+
+					// SRVのDescriptorTableを設定(rootParameters[2]の場所)
+					commandList->SetGraphicsRootDescriptorTable(2, srvHandle2);
+
+					// 描画コマンド
+					commandList->DrawInstanced(3, 1, 3, 0);
+				}
 			}
 
-			//==========================================
-			// 2枚目の三角形の描画処理
-			//==========================================
+			//=================================================================
+			// 「映像演出」の複数の三角形の描画
+			//=================================================================
 
-			if (isAlive2 == true) {
+			if (isVisualDirection) {
 
-				// transform2(ImGuiで動く値)からアフィン変換行列を作成
-				Matrix4x4 worldMatrix2 = MathUtils::MakeAffineMatrix(transform2.scale, transform2.rotate, transform2.translate);
+				// ImGuiで選択されているブレンドモードのPSOをバインドする
+				commandList->SetPipelineState(effectPipelineStates[currentBlendIndex]);
 
-				// WVP行列の計算
-				Matrix4x4 wvpMatrix2 = MathUtils::Multiply(worldMatrix2, MathUtils::Multiply(viewMatrix, projectionMatrix));
-
-				// 2番用の定数バッファへWVP行列データを書き込む
-				*wvpData2 = wvpMatrix2;
-
-				// 定数バッファのバインド(レジスタ1番)
-				commandList->SetGraphicsRootConstantBufferView(1, wvpResource2->GetGPUVirtualAddress());
-
-				// デフォルトを「textureSrvHandleGPU(uvChecker)」に統一し、インデックスが1のときだけ(monsterBall)に切り替える
-
-				// 0番:uvChecker(初期値)
-				D3D12_GPU_DESCRIPTOR_HANDLE srvHandle2 = textureSrvHandleGPU;
-
-				if (textureIndex2 == 1) {
-					// 1番:monsterBall
-					srvHandle2 = textureSrvHandleGPU2;
+				// マテリアルカラーをImGuiで選んだ色で毎フレーム上書きする
+				if (materialData != nullptr) {
+					*materialData = effectColor;
 				}
+				commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-				// SRVのDescriptorTableを設定(rootParameters[2]の場所)
-				commandList->SetGraphicsRootDescriptorTable(2, srvHandle2);
+				// ルートシグネチャのエラーを防ぐため、安全にテクスチャをバインドしておく
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-				// 描画コマンド
-				commandList->DrawInstanced(3, 1, 3, 0);
+				for (int i = 0; i < kMaxEffectObjects; i++) {
+					// 各オブジェクト専用の定数バッファをバインド
+					commandList->SetGraphicsRootConstantBufferView(1, effectWvpResources[i]->GetGPUVirtualAddress());
+
+					// 描画!!(頂点バッファの0番から3つの頂点を使って三角形を描画)
+					commandList->DrawInstanced(3, 1, 0, 0);
+				}
 			}
 
 			// 実際のcommandListのImGui描画コマンドを積む
@@ -1949,7 +2424,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// パイプライン・シェーダー関連リソースの解放
 	graphicsPipelineState->Release();
+
+	if (effectPipelineStates[currentBlendIndex]) {
+		effectPipelineStates[currentBlendIndex]->Release();
+	}
+
+	if (effectPixelShaderBlob) { effectPixelShaderBlob->Release(); }
+
 	rootSignature->Release();
+
+	for (int i = 0; i < kMaxEffectObjects; i++) {
+		if (effectWvpResources[i]) {
+			effectWvpResources[i]->Release();
+		}
+	}
 
 	if (signatureBlob) {
 		signatureBlob->Release();
@@ -1963,9 +2451,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	vertexShaderBlob->Release();
 
 	// バッファ・マテリアルリソースの解放
-	/*wvpResource->Release();*/
-	if (wvpResource1) { wvpResource1->Release(); }
-	if (wvpResource2) { wvpResource2->Release(); }
+	if (wvpResource1) {
+		wvpResource1->Release();
+	}
+
+	if (wvpResource2) {
+		wvpResource2->Release();
+	}
 
 	materialResource->Release();
 	vertexResource->Release();
@@ -1975,8 +2467,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	rtvDescriptorHeap->Release();
 
 	// スワップチェーン関連の解放
-	if (swapChainResources[0]) { swapChainResources[0]->Release(); }
-	if (swapChainResources[1]) { swapChainResources[1]->Release(); }
+	if (swapChainResources[0]) {
+		swapChainResources[0]->Release();
+	}
+
+	if (swapChainResources[1]) {
+		swapChainResources[1]->Release();
+	}
+
 	swapChain->Release();
 
 	// コマンド関連・デバイスの解放
