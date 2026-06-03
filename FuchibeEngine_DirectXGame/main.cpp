@@ -2425,11 +2425,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// パイプライン・シェーダー関連リソースの解放
 	graphicsPipelineState->Release();
 
-	if (effectPipelineStates[currentBlendIndex]) {
-		effectPipelineStates[currentBlendIndex]->Release();
+	for (int i = 0; i < BlendMode_Count; i++) {
+		if (effectPipelineStates[i]) {
+			effectPipelineStates[i]->Release();
+			effectPipelineStates[i] = nullptr;
+		}
 	}
 
-	if (effectPixelShaderBlob) { effectPixelShaderBlob->Release(); }
+	if (effectPixelShaderBlob) {
+		effectPixelShaderBlob->Release();
+	}
 
 	rootSignature->Release();
 
