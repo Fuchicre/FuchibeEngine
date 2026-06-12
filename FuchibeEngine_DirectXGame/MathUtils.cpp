@@ -146,7 +146,23 @@ Matrix4x4 MathUtils::MakeTranslateMatrix(const Vector3& translate) {
 	return result;
 }
 
-// 乗算行列の作成関数
+// Matrix4x4の乗算行列の作成関数
+//Matrix4x4 MathUtils::MultiplyMatrix4x4(Matrix4x4 matrix1, Matrix4x4 matrix2) {
+//
+//	Matrix4x4 result = {};
+//
+//	for (int i = 0; i < 4; ++i) {
+//		for (int j = 0; j < 4; ++j) {
+//			for (int k = 0; k < 4; ++k) {
+//				result.m[i][j] += matrix1.m[i][k] * matrix2.m[k][j];
+//			}
+//		}
+//	}
+//
+//	return result;
+//
+//}
+
 Matrix4x4 MathUtils::Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
 	Matrix4x4 result = {};
@@ -162,6 +178,11 @@ Matrix4x4 MathUtils::Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 	return result;
 
 }
+
+// Vector同士の乗算行列の作成関数
+//Vector3 MathUtils::MultiplyVector(Vector3 vector1, Vector3 vector2, Vector3 vector3){
+//	
+//}
 
 // アフィン変換行列の作成関数
 Matrix4x4 MathUtils::MakeAffineMatrix(Vector3 scale, Vector3 rotateXYZ, Vector3 translate) {
@@ -348,6 +369,31 @@ Vector3 MathUtils::TransformMatrix(const Vector3& vector, const Matrix4x4& matri
 		result.y /= w;
 		result.z /= w;
 	}
+
+	return result;
+
+}
+
+// 長さ(ノルム)
+float MathUtils::Length(const Vector3& vector) {
+	return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+// 正規化関数
+Vector3 MathUtils::Normalize(const Vector3& vector) {
+
+	float length = Length(vector);
+
+	// 長さがゼロの場合はゼロベクトルを返す
+	if (length == 0.0f) {
+		return { 0.0f, 0.0f, 0.0f };
+	}
+
+	// 各成分を長さで割る
+	Vector3 result;
+	result.x = vector.x / length;
+	result.y = vector.y / length;
+	result.z = vector.z / length;
 
 	return result;
 
