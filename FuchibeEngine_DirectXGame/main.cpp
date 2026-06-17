@@ -88,6 +88,15 @@ struct VertexData {
 struct Material {
 	Vector4 color;
 	int32_t enableLighting;
+	float padding[3];
+	Matrix4x4 uvTransform;
+};
+
+// UVTransform用の変数
+Transform uvTransformSprite{
+	{1.0f, 1.0f, 1.0f},
+	{0.0f, 0.0f, 0.0f},
+	{0.0f, 0.0f, 0.0f},
 };
 
 // TransformationMatrix
@@ -1320,6 +1329,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	materialData->enableLighting = true;
 
+	materialData->uvTransform = MathUtils::MakeIdentity4x4();
+
 #pragma endregion
 
 	//================================
@@ -1344,6 +1355,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// SpriteはLightingしないのでfalseにする
 	materialSpriteData->enableLighting = false;
+
+	materialSpriteData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1464,11 +1477,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソースの先頭アドレスから使う
 	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
 
-	// 使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
-
 	// 1頂点あたりのサイズ
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+
+	// 使用するリソースのサイズは頂点4つ分のサイズ
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 4;
 
 #pragma endregion
 
@@ -1586,8 +1599,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	float w = 640.0f;
 	float h = 360.0f;
 
-	// 1枚目の三角形 //
-
 	// 左下
 	vertexDataSprite[0].position = { 0.0f, h, 0.0f, 1.0f };
 	vertexDataSprite[0].texcoord = { 0.0f, 1.0f };
@@ -1600,22 +1611,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	vertexDataSprite[2].position = { w, h, 0.0f, 1.0f };
 	vertexDataSprite[2].texcoord = { 1.0f, 1.0f };
 
-	// 2枚目の三角形 //
-
 	// 左上
-	vertexDataSprite[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexDataSprite[3].texcoord = { 0.0f, 0.0f };
-
-	// 右上
-	vertexDataSprite[4].position = { w, 0.0f, 0.0f, 1.0f };
-	vertexDataSprite[4].texcoord = { 1.0f, 0.0f };
-
-	// 右下
-	vertexDataSprite[5].position = { w, h, 0.0f, 1.0f };
-	vertexDataSprite[5].texcoord = { 1.0f, 1.0f };
+	vertexDataSprite[3].position = { w, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[3].texcoord = { 1.0f, 0.0f };
 
 	// 全頂点に対して法線を設定(Sprite用)
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 4; i++) {
 		vertexDataSprite[i].normal = { 0.0f, 0.0f, -1.0f };
 	}
 
@@ -1837,9 +1838,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//======================
-	// SRVの切り替え用の変数
-	//======================
+	//=======================
+	// ImGuiの切り替え用の変数
+	//=======================
 
 	bool useMonsterBall = true;
 	bool isSpriteVisible = false;
@@ -1880,7 +1881,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 			ImGui::Begin("Settings");
 
-			ImGui::Text("Sphere");
+			ImGui::Text("-Sphere-");
 
 			// 球のカメラの位置を動かせるスライダー
 			ImGui::SliderFloat3("Camera Position", &cameraTransform.translate.x, -20.0f, 10.0f);
@@ -1918,7 +1919,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::Separator();
 
-			ImGui::Text("Sprite");
+			ImGui::Text("-Sprite-");
 
 			// Spriteの表示・非表示切り替え用のチェックボックス
 			ImGui::Checkbox("Toggling Sprite Display", &isSpriteVisible);
@@ -1927,6 +1928,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// SpriteのXとYの座標のみを動かせるスライダー(画面サイズ内で制限)
 			ImGui::SliderFloat2("Sprite Position", spritePos, 0.0f, static_cast<float>(kClientWidth));
+
+			ImGui::Separator();
+
+			// SpriteのUV座標系を動かせる
+			ImGui::Text("UV Transform");
+
+			ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+			ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
 
 			ImGui::Separator();
 
@@ -1975,6 +1985,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// Sprite用のCBufferの中身を更新する
 			*transformMatrixDataSprite = worldViewProjectionMatrixSprite;
+
+			// UVTransform用の行列の作成 //
+			Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
+			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(uvTransformSprite.rotate.z));
+			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
+			materialSpriteData->uvTransform = uvTransformMatrix;
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
