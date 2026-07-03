@@ -17,7 +17,7 @@ struct DirectionalLight{
 
 ConstantBuffer<Material> gMaterial : register(b0);
 
-ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
+ConstantBuffer<DirectionalLight> gDirectionalLight : register(b3);
 
 struct PixelShaderOutput{
     float32_t4 color : SV_TARGET0;
