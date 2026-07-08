@@ -278,7 +278,7 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(
 
 #pragma region CompileShader関数
 
-IDxcBlob* CompileShader(
+Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	const std::wstring& filePath,
 	const wchar_t* profile,
 	IDxcUtils* dxcUtils,
@@ -289,7 +289,7 @@ IDxcBlob* CompileShader(
 	Log(ConvertString(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
 
 	// hlslファイルを読む
-	IDxcBlobEncoding* shaderSource = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
 
 	// 読めなかったら止める
@@ -313,14 +313,14 @@ IDxcBlob* CompileShader(
 	};
 
 	// 実際にシェーダーをコンパイルする
-	IDxcResult* shaderResult = nullptr;
+	Microsoft::WRL::ComPtr<IDxcResult> shaderResult = nullptr;
 	hr = dxcCompiler->Compile(&shaderSourceBuffer, arguments, _countof(arguments), includeHandler, IID_PPV_ARGS(&shaderResult));
 
 	// コンパイルエラーではなくdxcが起動できないなどの根本的なエラーが発生した場合は止める
 	assert(SUCCEEDED(hr));
 
 	// 警告・エラーが出ていたらログに出力して止める
-	IDxcBlobUtf8* shaderError = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> shaderError = nullptr; shaderError = nullptr;
 	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
 
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
@@ -331,16 +331,12 @@ IDxcBlob* CompileShader(
 	}
 
 	// コンパイル結果から実行用のバイナリ部分を取得する
-	IDxcBlob* shaderBlob = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = nullptr; shaderBlob = nullptr;
 	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
 	assert(SUCCEEDED(hr));
 
 	// 成功したログを出力する
 	Log(ConvertString(std::format(L"Compile Succeeded, path:{}, profile:{}\n", filePath, profile)));
-
-	// もう使わないリソースを解放する
-	shaderSource->Release();
-	shaderResult->Release();
 
 	// 実行用のバイナリを返す
 	return shaderBlob;
@@ -969,7 +965,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		infoQueue->PushStorageFilter(&filter);
 
 		// 解放
-		infoQueue->Release();
+		/*infoQueue->Release();*/
 	}
 
 #endif
@@ -1070,17 +1066,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = swapChain->GetBuffer(1, IID_PPV_ARGS(&tempBuffer1));
 	assert(SUCCEEDED(hr));
 
-	// デフォルトコンストラクタがないため、初期化リストを用いて直接生成する
-	// ComPtrは自動で内部の参照カウンタをインクリメントしないため、
-	// ResourceObjectのデストラクタでRelease()される分を考慮し、
-	// 一時的に参照カウンタを1増やす(AddRef)か、生ポインタをそのまま管理させる
-	// 通常はSwapChainのBufferはComPtr側をResetするか、AddRefしてResourceObjectに所有権を渡す
 	tempBuffer0->AddRef();
 	tempBuffer1->AddRef();
 
-	ResourceObject swapChainResources[2] = {
-		ResourceObject(tempBuffer0.Get()),
-		ResourceObject(tempBuffer1.Get())
+	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = {
+		Microsoft::WRL::ComPtr<ID3D12Resource>(tempBuffer0.Get()),
+		Microsoft::WRL::ComPtr<ID3D12Resource>(tempBuffer1.Get())
 	};
 
 #pragma endregion
@@ -1349,8 +1340,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
 
 	// シリアライズしてバイナリにする
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
+	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
 
 	if (FAILED(hr)) {
@@ -1430,10 +1421,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region シェーダーをコンパイルする
 
-	IDxcBlob* vertexShaderBlob = CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, dxcIncludeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, dxcIncludeHandler);
 	assert(vertexShaderBlob != nullptr);
 
-	IDxcBlob* pixelShaderBlob = CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, dxcIncludeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, dxcIncludeHandler);
 	assert(pixelShaderBlob != nullptr);
 
 #pragma endregion
@@ -1878,10 +1869,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = commandQueue->Signal(fence.Get(), fenceValue);
 	assert(SUCCEEDED(hr));
 
-	if (fence->GetCompletedValue() < fenceValue) {
+	/*if (fence->GetCompletedValue() < fenceValue) {
 		fence->SetEventOnCompletion(fenceValue, fenceEvent);
 		WaitForSingleObject(fenceEvent, INFINITE);
-	}
+	}*/
 
 	// 実行が完了したので、allocatorとcommandListをResetして次のコマンドを積めるようにする
 	hr = commandAllocator->Reset();
@@ -1889,12 +1880,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	hr = commandList->Reset(commandAllocator.Get(), nullptr);
 	assert(SUCCEEDED(hr));
-
-	// 転送が終わったので、不要になった中間リソースとCPUメモリを安全に解放する
-	intermediateResource1.Get()->Release();
-	mipImages1.Release();
-	intermediateResource2.Get()->Release();
-	mipImages2.Release();
 
 #pragma endregion
 
