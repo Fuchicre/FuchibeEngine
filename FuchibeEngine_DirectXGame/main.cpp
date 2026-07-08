@@ -14,7 +14,6 @@
 #include <dxgidebug.h>
 #include <dxcapi.h>
 #include "MathUtils.h"
-#include "ResourceObject.h"
 #include "externals/DirectXTex/DirectXTex.h"
 #include "externals/DirectXTex/d3dx12.h"
 #include <vector>
@@ -1086,7 +1085,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region DepthStencilResourceの生成
 
 	// ウィンドウと同じサイズで生成
-	ResourceObject depthStencilResource = CreateDepthStencilTexture(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTexture(device.Get(), kClientWidth, kClientHeight);
 
 #pragma endregion
 
@@ -1510,17 +1509,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ModelData modelData1 = LoadObjFile("resources", "plane.obj");
 
 	// 「plane.obj」モデルの頂点リソースの生成
-	ResourceObject vertexResource1 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData1.vertices.size());
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource1 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData1.vertices.size());
 
 	// Sprite用の頂点リソースを作成する
-	ResourceObject vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
 
 	//================================
 	// 「axis.obj」のモデルとテクスチャ
 	//================================
 
 	ModelData modelData2 = LoadObjFile("resources", "axis.obj");
-	ResourceObject vertexResource2 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData2.vertices.size());
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource2 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData2.vertices.size());
 
 #pragma endregion
 
@@ -1535,7 +1534,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ResourceObject materialResource1 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource1 = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
 	Material* materialData1 = nullptr;
@@ -1557,7 +1556,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ResourceObject materialResource2 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource2 = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
 	Material* materialData2 = nullptr;
@@ -1583,7 +1582,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region MaterialSpriteResourceの生成
 
 	// Sprite用のMaterialResourceを作る
-	ResourceObject materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// MaterialSpriteDataにデータを書き込む
 	Material* materialSpriteData = nullptr;
@@ -1610,7 +1609,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region DirectionalLightResourceの生成
 
 	// DirectionalLight用のResourceを作る
-	ResourceObject directionalLightResource = CreateBufferResource(device.Get(), sizeof(DirectionalLight));
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = CreateBufferResource(device.Get(), sizeof(DirectionalLight));
 
 	// DirectionalLightResourceにデータを書き込む
 	DirectionalLight* directionalLightData = nullptr;
@@ -1634,7 +1633,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region IndexResourceSpriteの生成
 
-	ResourceObject indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
 
 #pragma endregion
 
@@ -1645,7 +1644,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region TransformMatrixResourceの生成
 
 	// SphereのWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ResourceObject wvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
 	Matrix4x4* wvpData = nullptr;
@@ -1660,7 +1659,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	*(wvpData + 1) = MathUtils::MakeIdentity4x4();
 
 	// Sprite用もWVP用と同様にMatrix4x4 2つ分 のサイズ(128バイト)を用意する
-	ResourceObject transformMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
 	Matrix4x4* transformMatrixDataSprite = nullptr;
@@ -1823,7 +1822,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const DirectX::TexMetadata& metadata1 = mipImages1.GetMetadata();
 
 	// リソース作成
-	ResourceObject textureResource1 = CreateTextureResource(device.Get(), metadata1);
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource1 = CreateTextureResource(device.Get(), metadata1);
 
 	//===========================================
 	// 「axis.obj」のモデルのテクスチャを読み込む
@@ -1833,7 +1832,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 
 	// リソース作成
-	ResourceObject textureResource2 = CreateTextureResource(device.Get(), metadata2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(device.Get(), metadata2);
 
 #pragma endregion
 
@@ -1848,14 +1847,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===============================
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	ResourceObject intermediateResource1 = UploadTextureData(textureResource1.Get(), mipImages1, device.Get(), commandList.Get());
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource1 = UploadTextureData(textureResource1.Get(), mipImages1, device.Get(), commandList.Get());
 
 	//===============================
 	// 「axis.obj」のテクスチャを転送
 	//===============================
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	ResourceObject intermediateResource2 = UploadTextureData(textureResource2.Get(), mipImages2, device.Get(), commandList.Get());
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = UploadTextureData(textureResource2.Get(), mipImages2, device.Get(), commandList.Get());
 
 	// CommandListをCloseし、commandQueue->ExecuteCommandListsを使いキックする
 	hr = commandList->Close();
