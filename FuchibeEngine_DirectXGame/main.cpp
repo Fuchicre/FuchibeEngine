@@ -18,6 +18,7 @@
 #include "externals/DirectXTex/d3dx12.h"
 #include <vector>
 #include <wrl.h>
+#include <xaudio2.h>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -29,6 +30,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dxcompiler.lib")
+#pragma comment(lib, "xaudio2.lib")
 
 //========================
 // ウィンドウプロシージャ
@@ -140,6 +142,40 @@ struct D3DResourceLeakChecker {
 			debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		}
 	}
+};
+
+// チャンクヘッダ
+struct ChunkHeader {
+	// チャンク用のID
+	char id[4];
+	// チャンクサイズ
+	int32_t size;
+};
+
+// RIFFヘッダチャンク
+struct RiffHeader {
+	// "RIFF"
+	ChunkHeader chunk;
+	// "WAVE"
+	char type[4];
+};
+
+// FMTチャンク
+struct FormatChunk {
+	// "fmt"
+	ChunkHeader chunk;
+	// 波形フォーマット
+	WAVEFORMATEX fmt;
+};
+
+// 音声データ
+struct SoundData {
+	// 波形フォーマット
+	WAVEFORMATEX wfex;
+	// バッファの先頭アドレス
+	BYTE* pBuffer;
+	// バッファのサイズ
+	unsigned int bufferSize;
 };
 
 // ログ出力用の関数
@@ -732,7 +768,35 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 
 #pragma endregion
 
-#pragma endregion
+//===========================================
+// SoundLoadWave関数(音声データを読み込む関数)
+//===========================================
+//
+//#pragma region SoundLoadWave関数(音声データを読み込む関数)
+//
+//SoundData SoundLoadWave(const char* filename) {
+//
+//	HRESULT result;
+//
+//	// ①ファイルオープン //
+//
+//	// ファイル入力ストリームのインスタンス
+//	std::ifstream file;
+//
+//	// .wavファイルをバイナリモードで開く
+//	file.open(filename, std::ios_base::binary);
+//
+//	// ファイルオープン失敗を検知する
+//	assert(file.is_open());
+//
+//	// ②.wavデータの読み込み
+//
+//	// 
+//}
+//
+//#pragma endregion
+//
+//#pragma endregion
 
 //===============
 // main関数
@@ -746,6 +810,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	D3DResourceLeakChecker leakCheck;
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory;
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
+	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
+	IXAudio2MasteringVoice* masterVoice;
 
 	// COMの初期化
 	assert(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
@@ -926,6 +992,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//======================
+	// XAudio2の初期化
+	//======================
+
+#pragma region XAudio2の初期化
+
+// COMライブラリの初期化
+	/*hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	assert(SUCCEEDED(hr));*/
+
+	// XAudio2エンジンのインスタンスを生成
+	hr = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+
+	if (FAILED(hr)) {
+		Log("Failed to create XAudio2 engine.\n");
+		assert(false);
+	}
+
+	// マスターボイスの作成
+	masterVoice = nullptr;
+
+	hr = xAudio2->CreateMasteringVoice(&masterVoice);
+
+	if (FAILED(hr)) {
+		Log("Failed to create Mastering Voice.\n");
+		assert(false);
+	}
+
+	Log("Complete create XAudio2 and Mastering Voice!!!\n");
+
+#pragma endregion
+
 	//=======================
 	// エラー及び警告での停止
 	//=======================
@@ -962,9 +1060,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 指定したメッセージの表示を抑制する
 		infoQueue->PushStorageFilter(&filter);
-
-		// 解放
-		/*infoQueue->Release();*/
 	}
 
 #endif
