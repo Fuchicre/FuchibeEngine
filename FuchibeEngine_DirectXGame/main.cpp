@@ -19,6 +19,7 @@
 #include <vector>
 #include <wrl.h>
 #include "Audio.h"
+#include "Input.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -927,6 +928,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Log("Conplete create D3D12 Device!!!\n");
 
 #pragma endregion
+
+	//======================================
+	// 入力管理クラスのインスタンス生成と初期化
+	//======================================
+
+	// Inputクラスのポインタを変数として宣言する
+	Input* input = new Input();
+
+	// 作成したインスタンスの初期化関数を呼び出す
+	input->Initialize(wc.hInstance, hwnd);
 
 	//======================
 	// XAudio2の初期化
@@ -2157,6 +2168,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+			// 毎フレームのループ内で入力を更新
+			input->Update();
+
+			// 数字の0キーが押されていたら(トリガー処理)
+			if (input->IsTrigger(DIK_0)) {
+				// 出力ウィンドウに「hit 0」と表示
+				OutputDebugStringA("hit 0\n");
+			}
+
 			// 描画先のRTVとDSVを設定する
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 			dsvHandle.ptr += (0 * descriptorSizeDSV);
@@ -2303,6 +2323,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 #endif
+
+	//===========================
+	// 入力管理クラスの解放処理
+	//===========================
+
+	if (input) {
+		// クラス内部のDirectInputデバイスなどの解放関数を呼ぶ
+		input->Finalize();
+		// newしたメモリ領域を明示的に削除して解放する
+		delete input;
+		// 安全のためにポインタをクリアしておく
+		input = nullptr;
+	}
 
 	// pSourceVoiceの解放
 	if (pSourceVoice) {
