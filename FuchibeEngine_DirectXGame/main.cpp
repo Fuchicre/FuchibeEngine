@@ -18,7 +18,7 @@
 #include "externals/DirectXTex/d3dx12.h"
 #include <vector>
 #include <wrl.h>
-#include <xaudio2.h>
+#include "Audio.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -30,7 +30,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dxcompiler.lib")
-#pragma comment(lib, "xaudio2.lib")
 
 //========================
 // ウィンドウプロシージャ
@@ -142,40 +141,6 @@ struct D3DResourceLeakChecker {
 			debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		}
 	}
-};
-
-// チャンクヘッダ
-struct ChunkHeader {
-	// チャンク用のID
-	char id[4];
-	// チャンクサイズ
-	int32_t size;
-};
-
-// RIFFヘッダチャンク
-struct RiffHeader {
-	// "RIFF"
-	ChunkHeader chunk;
-	// "WAVE"
-	char type[4];
-};
-
-// FMTチャンク
-struct FormatChunk {
-	// "fmt"
-	ChunkHeader chunk;
-	// 波形フォーマット
-	WAVEFORMATEX fmt;
-};
-
-// 音声データ
-struct SoundData {
-	// 波形フォーマット
-	WAVEFORMATEX wfex;
-	// バッファの先頭アドレス
-	BYTE* pBuffer;
-	// バッファのサイズ
-	unsigned int bufferSize;
 };
 
 // ログ出力用の関数
@@ -768,36 +733,6 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 
 #pragma endregion
 
-//===========================================
-// SoundLoadWave関数(音声データを読み込む関数)
-//===========================================
-//
-//#pragma region SoundLoadWave関数(音声データを読み込む関数)
-//
-//SoundData SoundLoadWave(const char* filename) {
-//
-//	HRESULT result;
-//
-//	// ①ファイルオープン //
-//
-//	// ファイル入力ストリームのインスタンス
-//	std::ifstream file;
-//
-//	// .wavファイルをバイナリモードで開く
-//	file.open(filename, std::ios_base::binary);
-//
-//	// ファイルオープン失敗を検知する
-//	assert(file.is_open());
-//
-//	// ②.wavデータの読み込み
-//
-//	// 
-//}
-//
-//#pragma endregion
-//
-//#pragma endregion
-
 //===============
 // main関数
 //===============
@@ -811,7 +746,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory;
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
-	IXAudio2MasteringVoice* masterVoice;
+	IXAudio2MasteringVoice* masterVoice = nullptr;
+	IXAudio2SourceVoice* pSourceVoice = nullptr;
 
 	// COMの初期化
 	assert(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
@@ -998,29 +934,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region XAudio2の初期化
 
-// COMライブラリの初期化
-	/*hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-	assert(SUCCEEDED(hr));*/
-
 	// XAudio2エンジンのインスタンスを生成
 	hr = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-
-	if (FAILED(hr)) {
-		Log("Failed to create XAudio2 engine.\n");
-		assert(false);
-	}
 
 	// マスターボイスの作成
 	masterVoice = nullptr;
 
 	hr = xAudio2->CreateMasteringVoice(&masterVoice);
-
-	if (FAILED(hr)) {
-		Log("Failed to create Mastering Voice.\n");
-		assert(false);
-	}
-
-	Log("Complete create XAudio2 and Mastering Voice!!!\n");
 
 #pragma endregion
 
@@ -1395,7 +1315,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// PixelShaderで使う
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-	// レジスタ番号1を使う
+	// レジスタ番号3を使う
 	rootParameters[3].Descriptor.ShaderRegister = 3;
 
 	// ルートパラメータ配列へのポインタ
@@ -1589,6 +1509,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(hr));
 
 #pragma endregion
+
+	//===================================
+	// オーディオシステムの初期化と読み込み
+	//===================================
+
+	Audio* audioManager = Audio::GetInstance();
+
+	// XAudio2の初期化
+	audioManager->Initialize();
+
+	//======================
+	// 音声データの読み込み
+	//======================
+
+	Audio::SoundData soundData1 = audioManager->SoundLoadWave("resources/Alarm01.wav");
 
 	//=======================
 	// VertexResourceの生成
@@ -1963,11 +1898,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = commandQueue->Signal(fence.Get(), fenceValue);
 	assert(SUCCEEDED(hr));
 
-	/*if (fence->GetCompletedValue() < fenceValue) {
-		fence->SetEventOnCompletion(fenceValue, fenceEvent);
-		WaitForSingleObject(fenceEvent, INFINITE);
-	}*/
-
 	// 実行が完了したので、allocatorとcommandListをResetして次のコマンドを積めるようにする
 	hr = commandAllocator->Reset();
 	assert(SUCCEEDED(hr));
@@ -2031,6 +1961,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// SRVを作成(インデックス2の場所に書き込まれる)
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+
+#pragma endregion
+
+	//================
+	// サウンドの再生
+	//================
+
+#pragma region サウンドの再生
+
+	audioManager->SoundPlayWave(soundData1);
 
 #pragma endregion
 
@@ -2363,6 +2303,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 #endif
+
+	// pSourceVoiceの解放
+	if (pSourceVoice) {
+		pSourceVoice->DestroyVoice();
+		pSourceVoice = nullptr;
+	}
+
+	// 音声データの解放
+	audioManager->SoundUnload(&soundData1);
+
+	// XAudio2の解放処理
+	audioManager->Finalize();
 
 	// ウィンドウを閉じる
 	CloseWindow(hwnd);
