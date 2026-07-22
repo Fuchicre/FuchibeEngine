@@ -83,26 +83,80 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 /// <summary>
 /// 毎フレームの最初に入力状態を更新する処理
 /// </summary>
+//void Input::Update() {
+//
+//	// 新しい入力を得る前に、現在の入力状態を「1つ前のフレームの状態(preKey)」へ丸ごとコピーする
+//	// これにより、前フレームと現フレームの比較(トリガー判定)ができるようになる
+//	memcpy(preKey, key, sizeof(key));
+//
+//	// キーボード情報の取得開始
+//	keyboard->Acquire();
+//
+//	// 全キーの入力状態を取得する
+//	keyboard->GetDeviceState(sizeof(key), key);
+//
+//	// マウスの前フレーム状態を保存
+//	preMouseState = mouseState;
+//
+//	// マウス情報の取得開始
+//	mouse->Acquire();
+//
+//	// マウスの入力状態を取得する
+//	mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
+//}
+
+
+/// <summary>
+/// 毎フレームの最初に入力状態を更新する処理
+/// </summary>
 void Input::Update() {
 
 	// 新しい入力を得る前に、現在の入力状態を「1つ前のフレームの状態(preKey)」へ丸ごとコピーする
 	// これにより、前フレームと現フレームの比較(トリガー判定)ができるようになる
 	memcpy(preKey, key, sizeof(key));
 
-	// キーボード情報の取得開始
-	keyboard->Acquire();
+	//======================
+	// キーボード情報の更新
+	//======================
 
-	// 全キーの入力状態を取得する
-	keyboard->GetDeviceState(sizeof(key), key);
+	if (keyboard) {
+
+		HRESULT hr = keyboard->GetDeviceState(sizeof(key), key);
+
+		if (FAILED(hr)) {
+
+			// デバイスの制御権が失われている場合は再取得を試みる
+			if (hr == DIERR_INPUTLOST || hr == DIERR_NOTACQUIRED) {
+				keyboard->Acquire();
+			}
+
+			// 取得失敗時は入力状態をクリア(押しっぱなし誤作動の防止)
+			memset(key, 0, sizeof(key));
+		}
+	}
 
 	// マウスの前フレーム状態を保存
 	preMouseState = mouseState;
 
-	// マウス情報の取得開始
-	mouse->Acquire();
+	//===================
+	// マウス情報の更新
+	//===================
 
-	// マウスの入力状態を取得する
-	mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
+	if (mouse) {
+
+		HRESULT hr = mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
+
+		if (FAILED(hr)) {
+
+			// デバイスの制御権が失われている場合は再取得を試みる
+			if (hr == DIERR_INPUTLOST || hr == DIERR_NOTACQUIRED) {
+				mouse->Acquire();
+			}
+
+			// 取得失敗時は入力状態をクリア
+			memset(&mouseState, 0, sizeof(mouseState));
+		}
+	}
 }
 
 /// <summary>

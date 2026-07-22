@@ -6,20 +6,18 @@ void DebugCamera::Initialize() {
 
 	// 単位行列で回転を初期化
 	mMatRot = MathUtils::MakeIdentity4x4();
-	mTranslation = { 0.0f, 0.0f, -50.0f };
+	mTranslation = kDefaultTranslation;
 
 	// 射影行列の生成
-	float fovY = 0.45f;
-	float aspectRatio = 1280.0f / 720.0f;
-	float nearClip = 0.1f;
-	float farClip = 1000.0f;
+	float fovY = kDefaultFovY;
+	float aspectRatio = kDefaultAspectRatio;
+	float nearClip = kDefaultNearClip;
+	float farClip = kDefaultFarClip;
 
 	mProjectionMatrix = MathUtils::MakePerspectiveFovMatrix(fovY, aspectRatio, nearClip, farClip);
 
 	// 初回のビュー行列の更新
-	Matrix4x4 matTrans = MathUtils::MakeTranslateMatrix(mTranslation);
-	Matrix4x4 worldMatrix = MathUtils::Multiply(mMatRot, matTrans);
-	mViewMatrix = MathUtils::Inverse(worldMatrix);
+	UpdateViewMatrix();
 }
 
 // 更新関数
@@ -29,95 +27,113 @@ void DebugCamera::Update(Input* input) {
 		return;
 	}
 
+	// 回転処理(マウス・矢印キー)
+	ProcessRotation(input);
+
+	// 移動処理(WASD / EQ / ズーム)
+	ProcessTranslation(input);
+
+	// ビュー行列の更新
+	UpdateViewMatrix();
+}
+
+// カメラのリセット関数
+void DebugCamera::Reset() {
+	Initialize();
+}
+
+// 回転処理
+void DebugCamera::ProcessRotation(Input* input) {
+
 	//=========================
-	// 入力処理(回転・移動)
+	// 入力処理(回転)
 	//==========================
-
-	// 移動速度
-	const float moveSpeed = 0.5f;
-
-	// 回転速度(ラジアン)
-	const float rotSpeed = 0.02f;
 
 	// マウスによる操作(ホイールズーム / ホイールクリックドラッグ回転)
 	Input::MouseMove mouseMove = input->GetMouseMove();
 
-	// マウスホイールによる拡大・縮小
-	if (mouseMove.lZ != 0) {
-		const float zoomSpeed = 0.05f;
-		mTranslation.z += static_cast<float>(mouseMove.lZ) * zoomSpeed;
-	}
+	float mouseRotX = 0.0f;
+	float mouseRotY = 0.0f;
 
 	// マウスホイール押下(ボタン2)中のドラッグによる回転
 	if (input->IsPressMouse(2)) {
-		const float mouseRotSpeed = 0.005f;
-
-		float mouseRotX = -static_cast<float>(mouseMove.lY) * mouseRotSpeed;
-		float mouseRotY = -static_cast<float>(mouseMove.lX) * mouseRotSpeed;
-
-		Matrix4x4 matRotDeltaMouse = MathUtils::MakeIdentity4x4();
-		matRotDeltaMouse = MathUtils::Multiply(matRotDeltaMouse, MathUtils::MakeRotateXMatrix(mouseRotX));
-		matRotDeltaMouse = MathUtils::Multiply(matRotDeltaMouse, MathUtils::MakeRotateYMatrix(mouseRotY));
-
-		mMatRot = MathUtils::Multiply(matRotDeltaMouse, mMatRot);
+		mouseRotX = -static_cast<float>(mouseMove.lY) * mMouseRotSpeed;
+		mouseRotY = -static_cast<float>(mouseMove.lX) * mMouseRotSpeed;
 	}
 
 	// 回転処理(矢印キー)
-	float rotX = 0.0f;
-	float rotY = 0.0f;
+	float keyRotX = 0.0f;
+	float keyRotY = 0.0f;
 
 	// 上キーで上を向く
 	if (input->IsPress(DIK_UPARROW)) {
-		rotX += rotSpeed;
-
+		keyRotX += mRotSpeed;
 	}
 
 	// 下キーで下を向く
 	if (input->IsPress(DIK_DOWNARROW)) {
-		rotX -= rotSpeed;
+		keyRotX -= mRotSpeed;
 	}
 
 	// 左キーで左を見る
 	if (input->IsPress(DIK_LEFTARROW)) {
-		rotY += rotSpeed;
+		keyRotY += mRotSpeed;
 	}
 
 	// 右キーで右を見る
 	if (input->IsPress(DIK_RIGHTARROW)) {
-		rotY -= rotSpeed;
+		keyRotY -= mRotSpeed;
 	}
 
-	// 追加回転分の回転行列を生成
-	Matrix4x4 matRotDelta = MathUtils::MakeIdentity4x4();
-	matRotDelta = MathUtils::Multiply(matRotDelta, MathUtils::MakeRotateXMatrix(rotX));
-	matRotDelta = MathUtils::Multiply(matRotDelta, MathUtils::MakeRotateYMatrix(rotY));
+	// 合計の回転量を算出
+	float totalRotX = mouseRotX + keyRotX;
+	float totalRotY = mouseRotY + keyRotY;
 
-	// 累積の回転行列を合成
-	mMatRot = MathUtils::Multiply(matRotDelta, mMatRot);
+	if (totalRotX != 0.0f || totalRotY != 0.0f) {
+
+		// 追加回転分の回転行列を生成
+		Matrix4x4 matRotDelta = MathUtils::MakeIdentity4x4();
+		matRotDelta = MathUtils::Multiply(matRotDelta, MathUtils::MakeRotateXMatrix(totalRotX));
+		matRotDelta = MathUtils::Multiply(matRotDelta, MathUtils::MakeRotateYMatrix(totalRotY));
+
+		// 累積の回転行列を合成
+		mMatRot = MathUtils::Multiply(matRotDelta, mMatRot);
+	}
+}
+
+// 移動処理
+void DebugCamera::ProcessTranslation(Input* input) {
 
 	//========================
 	// 移動処理(WASD / EQ)
 	//========================
 
+	Input::MouseMove mouseMove = input->GetMouseMove();
+
+	// マウスホイールによる拡大・縮小
+	if (mouseMove.lZ != 0) {
+		mTranslation.z += static_cast<float>(mouseMove.lZ) * mZoomSpeed;
+	}
+
 	Vector3 move = { 0.0f, 0.0f, 0.0f };
 
 	// 前進
-	if (input->IsPress(DIK_W)) { move.z += moveSpeed; }
+	if (input->IsPress(DIK_W)) { move.z += mMoveSpeed; }
 
 	// 後退
-	if (input->IsPress(DIK_S)) { move.z -= moveSpeed; }
+	if (input->IsPress(DIK_S)) { move.z -= mMoveSpeed; }
 
 	// 右移動
-	if (input->IsPress(DIK_D)) { move.x += moveSpeed; }
+	if (input->IsPress(DIK_D)) { move.x += mMoveSpeed; }
 
 	// 左移動
-	if (input->IsPress(DIK_A)) { move.x -= moveSpeed; }
+	if (input->IsPress(DIK_A)) { move.x -= mMoveSpeed; }
 
 	// 上移動
-	if (input->IsPress(DIK_E)) { move.y += moveSpeed; }
+	if (input->IsPress(DIK_E)) { move.y += mMoveSpeed; }
 
 	// 下移動
-	if (input->IsPress(DIK_Q)) { move.y -= moveSpeed; }
+	if (input->IsPress(DIK_Q)) { move.y -= mMoveSpeed; }
 
 	// 移動ベクトルがある場合、カメラの現在の回転行列を使って変換する
 	if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {
@@ -128,6 +144,10 @@ void DebugCamera::Update(Input* input) {
 		mTranslation.y += transformedMove.y;
 		mTranslation.z += transformedMove.z;
 	}
+}
+
+// ビュー行列の更新
+void DebugCamera::UpdateViewMatrix() {
 
 	//=====================
 	// ビュー行列の更新
@@ -136,9 +156,4 @@ void DebugCamera::Update(Input* input) {
 	Matrix4x4 matTrans = MathUtils::MakeTranslateMatrix(mTranslation);
 	Matrix4x4 worldMatrix = MathUtils::Multiply(mMatRot, matTrans);
 	mViewMatrix = MathUtils::Inverse(worldMatrix);
-}
-
-// カメラのリセット関数
-void DebugCamera::Reset() {
-	Initialize();
 }
