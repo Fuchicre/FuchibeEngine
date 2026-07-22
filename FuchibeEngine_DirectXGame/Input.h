@@ -6,9 +6,20 @@
 #pragma comment(lib, "dxguid.lib")
 
 /// <summary>
-/// キーボード入力を一括管理するクラス
+/// キーボードおよびマウス入力を一括管理するクラス
 /// </summary>
 class Input {
+public:
+	// マウスの移動量およびホイール回転量を保持する構造体
+	struct MouseMove {
+		// X軸移動量
+		long lX;
+		// Y軸移動量
+		long lY;
+		// ホイール回転量
+		long lZ;
+	};
+
 private:
 	// DirectInputシステムの基盤となるインタフェースへのポインタ
 	IDirectInput8* directInput = nullptr;
@@ -24,9 +35,18 @@ private:
 	// 「押した瞬間（トリガー）」や「離した瞬間」を判定するための比較用に使用する
 	BYTE preKey[256] = {};
 
+	// マウスデバイスを操作するためのインタフェースへのポインタ
+	IDirectInputDevice8* mouse = nullptr;
+
+	// 現在のフレームにおけるマウスの入力状態
+	DIMOUSESTATE2 mouseState = {};
+
+	// 1つ前のフレームにおけるマウスの入力状態
+	DIMOUSESTATE2 preMouseState = {};
+
 public:
 	/// <summary>
-	/// DirectInputおよびキーボードデバイスの初期化処理
+	/// DirectInputおよびキーボード・マウスデバイスの初期化処理
 	/// </summary>
 	/// <param name="hInstance">アプリケーションのインスタンスハンドル</param>
 	/// <param name="hwnd">操作対象となるウィンドウのハンドル</param>
@@ -69,4 +89,16 @@ public:
 	/// <param name="keyCode">キー番号</param>
 	/// <returns>前フレームで押されていて、現フレームで離されていれば true</returns>
 	bool IsReleaseTrigger(uint8_t keyCode) const;
+
+	/// <summary>
+	/// 指定したマウスボタンが「押されている状態」かどうかを判定する
+	/// </summary>
+	/// <param name="buttonNumber">0:左ボタン, 1:右ボタン, 2:中ボタン(ホイールクリック)</param>
+	/// <returns>押されていれば true、離されていれば false</returns>
+	bool IsPressMouse(int32_t buttonNumber) const;
+
+	/// <summary>
+	/// マウスの移動量およびホイール回転量を取得する
+	/// </summary>
+	MouseMove GetMouseMove() const;
 };

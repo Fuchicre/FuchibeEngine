@@ -20,6 +20,7 @@
 #include <wrl.h>
 #include "Audio.h"
 #include "Input.h"
+#include "DebugCamera.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
@@ -1849,6 +1850,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//=======================
+	// デバッグカメラの初期化
+	//=======================
+
+#pragma region デバッグカメラの初期化
+
+	// デバッグカメラを使うかどうかのフラグ
+	bool useDebugCamera = false;
+
+	// デバッグカメラのインスタンス生成と初期化
+	std::unique_ptr<DebugCamera> debugCamera = std::make_unique<DebugCamera>();
+	debugCamera->Initialize();
+
+#pragma endregion
+
 	//============================
 	// Textureを読み込んで転送する
 	//============================
@@ -2041,6 +2057,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 			ImGui::Begin("Settings");
 
+			// カメラ切り替え用UI
+			ImGui::Separator();
+			ImGui::Text("- Camera -");
+			ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+
+			// デバッグカメラのリセットボタン
+			if (useDebugCamera) {
+				if (ImGui::Button("Reset Debug Camera")) {
+					debugCamera->Reset();
+				}
+			}
+
+			ImGui::Separator();
+
 			// モデルのトランスフォーム操作UI
 			ImGui::Text("-Model (plane.obj) Transform-");
 
@@ -2097,12 +2127,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif
 
 			// === データの計算・定数バッファの更新 === //
+			
+			// === デバッグカメラの更新(行列計算の前に呼び出す)=== //
+			if (useDebugCamera) {
+#ifdef USE_IMGUI
+				// キーボードもマウスもImGuiが操作中でない時だけカメラを動かす
+				ImGuiIO& imguiIO = ImGui::GetIO();
+				if (!imguiIO.WantCaptureKeyboard && !imguiIO.WantCaptureMouse) {
+					debugCamera->Update(input);
+				}
+#else
+				debugCamera->Update(input);
+#endif
+			}
+
+			// === データの計算・定数バッファの更新 === //
 
 			// WorldMatrixを作成
 			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-			Matrix4x4 cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-			Matrix4x4 viewMatrix = MathUtils::Inverse(cameraMatrix);
-			Matrix4x4 projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
+
+			// ビュー行列と射影行列の宣言
+			Matrix4x4 viewMatrix;
+			Matrix4x4 projectionMatrix;
+
+			if (useDebugCamera) {
+				// デバッグカメラの行列を使用
+				viewMatrix = debugCamera->GetViewMatrix();
+				projectionMatrix = debugCamera->GetProjectionMatrix();
+			} else {
+				// 通常カメラの行列を使用
+				Matrix4x4 cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+				viewMatrix = MathUtils::Inverse(cameraMatrix);
+				projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
+			}
 
 			// wvpMatrixを作成して更新
 			Matrix4x4 matWV = MathUtils::Multiply(worldMatrix, viewMatrix);

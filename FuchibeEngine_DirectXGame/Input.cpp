@@ -1,7 +1,5 @@
 #include "Input.h"
 #include <cassert>
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
 
 /// <summary>
 /// DirectInputおよびキーボードデバイスの初期化処理
@@ -59,6 +57,26 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY
 	);
 	assert(SUCCEEDED(hr));
+
+	// マウスデバイスの生成
+	hr = directInput->CreateDevice(
+		GUID_SysMouse,
+		&mouse,
+		nullptr
+	);
+	assert(SUCCEEDED(hr));
+
+	// 入力データ形式のセット(拡張マウスフォーマット)
+	hr = mouse->SetDataFormat(&c_dfDIMouse2);
+	assert(SUCCEEDED(hr));
+
+	// 排他制御レベルのセット
+	hr = mouse->SetCooperativeLevel(
+		hwnd,
+		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE
+	);
+	assert(SUCCEEDED(hr));
+
 #pragma endregion
 }
 
@@ -76,12 +94,28 @@ void Input::Update() {
 
 	// 全キーの入力状態を取得する
 	keyboard->GetDeviceState(sizeof(key), key);
+
+	// マウスの前フレーム状態を保存
+	preMouseState = mouseState;
+
+	// マウス情報の取得開始
+	mouse->Acquire();
+
+	// マウスの入力状態を取得する
+	mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
 }
 
 /// <summary>
 /// 解放処理
 /// </summary>
 void Input::Finalize() {
+
+	// マウスデバイスが作られていれば解放する
+	if (mouse) {
+		mouse->Unacquire();
+		mouse->Release();
+		mouse = nullptr;
+	}
 
 	// キーボードデバイスが作られていれば解放する
 	if (keyboard) {
@@ -137,4 +171,25 @@ bool Input::IsReleaseTrigger(uint8_t keyCode) const {
 	// 「前フレームで最上位ビットが1(押されていた)」かつ「現フレームで最上位ビットが0(離された)」
 	// この2つの条件が同時に満たされたとき、まさに「今キーが指から離れた瞬間」と判定する
 	return ((preKey[keyCode] & 0x80) != 0) && ((key[keyCode] & 0x80) == 0);
+}
+
+/// <summary>
+/// マウスボタンを押した状態か
+/// </summary>
+bool Input::IsPressMouse(int32_t buttonNumber) const {
+	if (buttonNumber < 0 || buttonNumber >= 8) {
+		return false;
+	}
+	return (mouseState.rgbButtons[buttonNumber] & 0x80) != 0;
+}
+
+/// <summary>
+/// マウスの移動量およびホイール回転量を取得する
+/// </summary>
+Input::MouseMove Input::GetMouseMove() const {
+	MouseMove move;
+	move.lX = mouseState.lX;
+	move.lY = mouseState.lY;
+	move.lZ = mouseState.lZ;
+	return move;
 }
