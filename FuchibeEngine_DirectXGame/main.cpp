@@ -1548,20 +1548,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 //====================================
 
 	// 「plane.obj」モデルの読み込み
-	ModelData modelData1 = LoadObjFile("resources", "plane.obj");
+	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
 
 	// 「plane.obj」モデルの頂点リソースの生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource1 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData1.vertices.size());
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
 
 	// Sprite用の頂点リソースを作成する
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
-
-	//================================
-	// 「axis.obj」のモデルとテクスチャ
-	//================================
-
-	ModelData modelData2 = LoadObjFile("resources", "axis.obj");
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource2 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData2.vertices.size());
 
 #pragma endregion
 
@@ -1576,44 +1569,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource1 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
-	Material* materialData1 = nullptr;
+	Material* planeModelMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData1));
+	planeModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialData1->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	planeModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Lightingを有効にする
-	materialData1->enableLighting = true;
-	materialData1->uvTransform = MathUtils::MakeIdentity4x4();
-
-	//===========================
-	// 「axis.obj」のマテリアル
-	//===========================
-
-	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource2 = CreateBufferResource(device.Get(), sizeof(Material));
-
-	// マテリアルにデータを書き込む
-	Material* materialData2 = nullptr;
-
-	// 書き込むためのアドレスを取得する
-	materialResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData2));
-
-	// 構造体の各メンバにデータを代入する
-
-	// 白色にする
-	materialData2->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	// Lightingを有効にする
-	materialData2->enableLighting = true;
-	materialData2->uvTransform = MathUtils::MakeIdentity4x4();
+	planeModelMaterialData->enableLighting = true;
+	planeModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1685,20 +1656,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region TransformMatrixResourceの生成
 
-	// SphereのWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+	// 「plane.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpPlaneModelResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	Matrix4x4* wvpPlaneModelData = nullptr;
 
 	// 書き込むためのアドレスを取得
-	wvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	wvpPlaneModelResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&wvpPlaneModelData));
 
 	// HLSL側のwvpに単位行列を書き込む
-	*wvpData = MathUtils::MakeIdentity4x4();
+	*wvpPlaneModelData = MathUtils::MakeIdentity4x4();
 
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
-	*(wvpData + 1) = MathUtils::MakeIdentity4x4();
+	*(wvpPlaneModelData + 1) = MathUtils::MakeIdentity4x4();
 
 	// Sprite用もWVP用と同様にMatrix4x4 2つ分 のサイズ(128バイト)を用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
@@ -1728,32 +1699,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//=======================
 
 	// 「plane.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView1{};
+	D3D12_VERTEX_BUFFER_VIEW planeModelVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
-	vertexBufferView1.BufferLocation = vertexResource1.Get()->GetGPUVirtualAddress();
+	planeModelVertexBufferView.BufferLocation = planeModelVertexResource.Get()->GetGPUVirtualAddress();
 
 	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView1.SizeInBytes = UINT(sizeof(VertexData) * modelData1.vertices.size());
+	planeModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * planeModelData.vertices.size());
 
 	// 1頂点あたりのサイズ
-	vertexBufferView1.StrideInBytes = sizeof(VertexData);
+	planeModelVertexBufferView.StrideInBytes = sizeof(VertexData);
 
-	//=======================
-	// 「axis.obj」モデル
-	//=======================
-
-	// 「axis.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView2{};
-
-	// リソースの先頭アドレスから使う
-	vertexBufferView2.BufferLocation = vertexResource2.Get()->GetGPUVirtualAddress();
-
-	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView2.SizeInBytes = UINT(sizeof(VertexData) * modelData2.vertices.size());
-
-	// 1頂点あたりのサイズ
-	vertexBufferView2.StrideInBytes = sizeof(VertexData);
 #pragma endregion
 
 	//================================
@@ -1767,28 +1723,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//=======================
 
 	// 「plane.obj」モデルの頂点リソースにデータを書き込む
-	VertexData* vertexData1 = nullptr;
+	VertexData* planeModelVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	vertexResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData1));
+	planeModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelVertexData));
 
 	// 頂点データをリソースにコピー
-	std::memcpy(vertexData1, modelData1.vertices.data(), sizeof(VertexData) * modelData1.vertices.size());
-	vertexResource1.Get()->Unmap(0, nullptr);
-
-	//=======================
-	// 「axis.obj」のモデル
-	//=======================
-
-	// 「axis.obj」モデルの頂点リソースにデータを書き込む
-	VertexData* vertexData2 = nullptr;
-
-	// 書き込むためのアドレスを取得する
-	vertexResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData2));
-
-	// 頂点データをリソースにコピー
-	std::memcpy(vertexData2, modelData2.vertices.data(), sizeof(VertexData) * modelData2.vertices.size());
-	vertexResource2.Get()->Unmap(0, nullptr);
+	std::memcpy(planeModelVertexData, planeModelData.vertices.data(), sizeof(VertexData) * planeModelData.vertices.size());
+	planeModelVertexResource.Get()->Unmap(0, nullptr);
 
 #pragma endregion
 
@@ -1875,21 +1817,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 「plane.obj」のモデルのテクスチャを読み込む
 	//==========================================
 
-	DirectX::ScratchImage mipImages1 = LoadTexture(modelData1.material.textureFilePath);
-	const DirectX::TexMetadata& metadata1 = mipImages1.GetMetadata();
+	DirectX::ScratchImage planeModelMipImages = LoadTexture(planeModelData.material.textureFilePath);
+	const DirectX::TexMetadata& planeModelMetadata = planeModelMipImages.GetMetadata();
 
 	// リソース作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource1 = CreateTextureResource(device.Get(), metadata1);
-
-	//===========================================
-	// 「axis.obj」のモデルのテクスチャを読み込む
-	//===========================================
-
-	DirectX::ScratchImage mipImages2 = LoadTexture(modelData2.material.textureFilePath);
-	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
-
-	// リソース作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(device.Get(), metadata2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = CreateTextureResource(device.Get(), planeModelMetadata);
 
 #pragma endregion
 
@@ -1904,33 +1836,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===============================
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource1 = UploadTextureData(textureResource1.Get(), mipImages1, device.Get(), commandList.Get());
-
-	//===============================
-	// 「axis.obj」のテクスチャを転送
-	//===============================
-
-	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = UploadTextureData(textureResource2.Get(), mipImages2, device.Get(), commandList.Get());
-
-	// CommandListをCloseし、commandQueue->ExecuteCommandListsを使いキックする
-	hr = commandList->Close();
-	assert(SUCCEEDED(hr));
-
-	ID3D12CommandList* initCommandLists[] = { commandList.Get() };
-	commandQueue->ExecuteCommandLists(1, initCommandLists);
-
-	// GPU側の実行が完了するのをフェンスを使って待つ
-	fenceValue++;
-	hr = commandQueue->Signal(fence.Get(), fenceValue);
-	assert(SUCCEEDED(hr));
-
-	// 実行が完了したので、allocatorとcommandListをResetして次のコマンドを積めるようにする
-	hr = commandAllocator->Reset();
-	assert(SUCCEEDED(hr));
-
-	hr = commandList->Reset(commandAllocator.Get(), nullptr);
-	assert(SUCCEEDED(hr));
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelIntermediateResource = UploadTextureData(planeModelTextureResource.Get(), planeModelMipImages, device.Get(), commandList.Get());
 
 #pragma endregion
 
@@ -1947,47 +1853,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================================
 
 	// metaDataを基にSRVを作成
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc1{};
-	srvDesc1.Format = metadata1.format;
-	srvDesc1.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	D3D12_SHADER_RESOURCE_VIEW_DESC planeModelSrvDesc{};
+	planeModelSrvDesc.Format = planeModelMetadata.format;
+	planeModelSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 	// 2Dテクスチャ
-	srvDesc1.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	planeModelSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
 	// テクスチャリソースが持っているすべてのミップマップレベルを自動的にすべて割り当てる(符号なし整数の最大値を直接表す「0xFFFFFFFF」に書き換える)
-	srvDesc1.Texture2D.MipLevels = 0xFFFFFFFF;
+	planeModelSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
 
 	// SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU1 = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU1 = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE planeModelTextureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE planeModelTextureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
 	// 先頭はImGuiが使っているのでその次を使う
-	textureSrvHandleCPU1.ptr += descriptorSizeSRV;
-	textureSrvHandleGPU1.ptr += descriptorSizeSRV;
+	planeModelTextureSrvHandleCPU.ptr += descriptorSizeSRV;
+	planeModelTextureSrvHandleGPU.ptr += descriptorSizeSRV;
 
 	// SRVを作成(インデックス1の場所に書き込まれる)
-	device->CreateShaderResourceView(textureResource1.Get(), &srvDesc1, textureSrvHandleCPU1);
-
-	//===========================================
-	// 「axis.obj」のテクスチャのSRVを作成
-	//===========================================
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-	srvDesc2.Format = metadata2.format;
-	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-	// 2Dテクスチャ
-	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc2.Texture2D.MipLevels = 0xFFFFFFFF;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = textureSrvHandleCPU1;
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = textureSrvHandleGPU1;
-
-	textureSrvHandleCPU2.ptr += descriptorSizeSRV;
-	textureSrvHandleGPU2.ptr += descriptorSizeSRV;
-
-	// SRVを作成(インデックス2の場所に書き込まれる)
-	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+	device->CreateShaderResourceView(planeModelTextureResource.Get(), &planeModelSrvDesc, planeModelTextureSrvHandleCPU);
 
 #pragma endregion
 
@@ -2103,7 +1988,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::Separator();
 
 			// 色編集用のImGui
-			ImGui::ColorEdit3("Sphere Color", &materialData1->color.x);
+			ImGui::ColorEdit3("Sphere Color", &planeModelMaterialData->color.x);
 
 			ImGui::Separator();
 
@@ -2126,9 +2011,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::End();
 #endif
 
-			// === データの計算・定数バッファの更新 === //
-			
-			// === デバッグカメラの更新(行列計算の前に呼び出す)=== //
+			//===================================
+			// フレームの先頭で入力を更新
+			//===================================
+
+			input->Update();
+
+			// 数字の0キーが押されていたら(トリガー処理)
+			if (input->IsTrigger(DIK_0)) {
+				OutputDebugStringA("hit 0\n");
+			}
+
+			// === デバッグカメラの更新(行列計算の前に呼び出す) === //
 			if (useDebugCamera) {
 #ifdef USE_IMGUI
 				// キーボードもマウスもImGuiが操作中でない時だけカメラを動かす
@@ -2144,29 +2038,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// === データの計算・定数バッファの更新 === //
 
 			// WorldMatrixを作成
-			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			Matrix4x4 modelWorldMatrix = MathUtils::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
 			// ビュー行列と射影行列の宣言
-			Matrix4x4 viewMatrix;
-			Matrix4x4 projectionMatrix;
+			Matrix4x4 modelViewMatrix;
+			Matrix4x4 modelProjectionMatrix;
 
 			if (useDebugCamera) {
 				// デバッグカメラの行列を使用
-				viewMatrix = debugCamera->GetViewMatrix();
-				projectionMatrix = debugCamera->GetProjectionMatrix();
+				modelViewMatrix = debugCamera->GetViewMatrix();
+				modelProjectionMatrix = debugCamera->GetProjectionMatrix();
 			} else {
 				// 通常カメラの行列を使用
 				Matrix4x4 cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-				viewMatrix = MathUtils::Inverse(cameraMatrix);
-				projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
+				modelViewMatrix = MathUtils::Inverse(cameraMatrix);
+				modelProjectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
 			}
 
 			// wvpMatrixを作成して更新
-			Matrix4x4 matWV = MathUtils::Multiply(worldMatrix, viewMatrix);
-			Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(matWV, projectionMatrix);
+			Matrix4x4 matModelWV = MathUtils::Multiply(modelWorldMatrix, modelViewMatrix);
+			Matrix4x4 modelWorldViewProjectionMatrix = MathUtils::Multiply(matModelWV, modelProjectionMatrix);
 
 			// CBufferの中身を更新
-			*wvpData = worldViewProjectionMatrix;
+			*wvpPlaneModelData = modelWorldViewProjectionMatrix;
 
 			// UVTransform行列の作成と更新
 			Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
@@ -2174,13 +2068,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
 
 			if (currentModelIndex == 0) {
-				materialData1->uvTransform = uvTransformMatrix;
-			} else {
-				materialData2->uvTransform = uvTransformMatrix;
+				planeModelMaterialData->uvTransform = uvTransformMatrix;
 			}
 
 			// 描画用の頂点数を決定
-			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(modelData1.vertices.size()) : UINT(modelData2.vertices.size());
+			UINT activeVertexCount = static_cast<UINT>(planeModelData.vertices.size());
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -2204,35 +2096,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// TransitionBarrierの設定
 			D3D12_RESOURCE_BARRIER barrier{};
-
-			// 今回のバリアはTransition
 			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-
-			// Noneにしておく
 			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-			// バリアを張る対象のResourceを指定する。現在のバックバッファに対して行う
 			barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
-
-			// 遷移前(現在)のResourceState
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-
-			// 遷移後のResourceState
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
 			// TransitionBarrierを張る
 			commandList->ResourceBarrier(1, &barrier);
-
 #pragma endregion
-
-			// 毎フレームのループ内で入力を更新
-			input->Update();
-
-			// 数字の0キーが押されていたら(トリガー処理)
-			if (input->IsTrigger(DIK_0)) {
-				// 出力ウィンドウに「hit 0」と表示
-				OutputDebugStringA("hit 0\n");
-			}
 
 			// 描画先のRTVとDSVを設定する
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -2259,17 +2131,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// Scissorを設定する
 			commandList->RSSetScissorRects(1, &scissorRect);
 
-			// RootSignatureを設定する。PSOにも設定しているが、別途設定が必要
+			// RootSignatureを設定する
 			commandList->SetGraphicsRootSignature(rootSignature.Get());
 
 			// PSOを設定する
 			commandList->SetPipelineState(graphicsPipelineState.Get());
 
-			// トポロジ(形状)を設定する。PSOに設定しているものとはまた別。同じものを設定すると考えておくといい
+			// トポロジ(形状)を設定する
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			// 常に1枚目のテクスチャ(textureSrvHandleGPU1)をバインドする
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
 
 			//==========================================
 			// モデル(3D)の描画設定(モデル切り替えも対応)
@@ -2279,23 +2148,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
 
 			// 共通のWVP行列設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpPlaneModelResource.Get()->GetGPUVirtualAddress());
 
-			// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
+			// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】を切り替える
 			if (currentModelIndex == 0) {
-
-				// Plane の描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource1.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView1);
-				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
-			} else {
-				// Axisの描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource2.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView2);
-				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
+				// Plane.obj の描画設定
+				commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
+				commandList->SetGraphicsRootDescriptorTable(2, planeModelTextureSrvHandleGPU);
 			}
 
-			// 確定した正しい頂点数(activeVertexCount)で、この1回だけ描画する
+			// 確定した正しい頂点数(activeVertexCount)で描画する
 			commandList->DrawInstanced(activeVertexCount, 1, 0, 0);
 
 			// 実際のcommandListのImGui描画コマンドを積む
@@ -2303,17 +2166,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
 #endif
 
-			// 画面に描く処理は全て終わり画面に映す準備ができたので、状態を遷移させる
-			// 今回はRenderTargetからPresentにする
+			// RenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 
 			// TransitionBarrierを張る
 			commandList->ResourceBarrier(1, &barrier);
 
-			// コマンドリストの内容を確定させる。全てのコマンドを積んでから、Closeすること
+			// コマンドリストの内容を確定させる
 			hr = commandList->Close();
-
+			assert(SUCCEEDED(hr));
 #pragma endregion
 
 			//=====================
@@ -2338,13 +2200,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// GPUがここまで辿り着いた時に、Fenceの値を指定した値に代入するようにSignalを送る
 			hr = commandQueue->Signal(fence.Get(), fenceValue);
+			assert(SUCCEEDED(hr));
 
 			// Fenceの値が指定したSignalの値に辿り着いているか確認する
 			if (fence->GetCompletedValue() < fenceValue) {
-
 				// 辿り着いていない場合は、Eventがシグナルされるまで待つ
 				fence->SetEventOnCompletion(fenceValue, fenceEvent);
-
 				// Eventを待つ
 				WaitForSingleObject(fenceEvent, INFINITE);
 			}
@@ -2355,14 +2216,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			hr = commandList->Reset(commandAllocator.Get(), nullptr);
 			assert(SUCCEEDED(hr));
-
 #pragma endregion
-
 #pragma endregion
 
 		}
 	}
-
 #pragma endregion
 
 	// 終了時に記録する
@@ -2371,7 +2229,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========
 	// 解放処理
 	//===========
-
 #pragma region 解放処理
 
 	// ImGuiの終了処理
@@ -2386,11 +2243,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================
 
 	if (input) {
-		// クラス内部のDirectInputデバイスなどの解放関数を呼ぶ
 		input->Finalize();
-		// newしたメモリ領域を明示的に削除して解放する
 		delete input;
-		// 安全のためにポインタをクリアしておく
 		input = nullptr;
 	}
 
@@ -2416,5 +2270,4 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	return 0;
 }
-
 #pragma endregion
