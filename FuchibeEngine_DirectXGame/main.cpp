@@ -1552,9 +1552,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 「plane.obj」モデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
-
 	// Sprite用の頂点リソースを作成する
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
 
 #pragma endregion
 
@@ -1589,29 +1588,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma endregion
 
 	//================================
-	// MaterialSpriteResourceの生成
+	// SpriteMaterialResourceの生成
 	//================================
 
-#pragma region MaterialSpriteResourceの生成
+#pragma region SpriteMaterialResourceの生成
 
 	// Sprite用のMaterialResourceを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// MaterialSpriteDataにデータを書き込む
-	Material* materialSpriteData = nullptr;
+	Material* spriteMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResourceSprite.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialSpriteData));
+	spriteMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&spriteMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialSpriteData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	spriteMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// SpriteはLightingしないのでfalseにする
-	materialSpriteData->enableLighting = false;
+	spriteMaterialData->enableLighting = false;
 
-	materialSpriteData->uvTransform = MathUtils::MakeIdentity4x4();
+	spriteMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1641,12 +1640,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma endregion
 
 	//===========================
-	// IndexResourceSpriteの生成
+	// SpriteIndexResourceの生成
 	//===========================
 
-#pragma region IndexResourceSpriteの生成
+#pragma region SpriteIndexResourceの生成
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteIndexResource = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
 
 #pragma endregion
 
@@ -1657,34 +1656,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region TransformMatrixResourceの生成
 
 	// 「plane.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpPlaneModelResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
-	Matrix4x4* wvpPlaneModelData = nullptr;
+	Matrix4x4* planeModelWvpData = nullptr;
 
 	// 書き込むためのアドレスを取得
-	wvpPlaneModelResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&wvpPlaneModelData));
+	planeModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelWvpData));
 
 	// HLSL側のwvpに単位行列を書き込む
-	*wvpPlaneModelData = MathUtils::MakeIdentity4x4();
+	*planeModelWvpData = MathUtils::MakeIdentity4x4();
 
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
-	*(wvpPlaneModelData + 1) = MathUtils::MakeIdentity4x4();
+	*(planeModelWvpData + 1) = MathUtils::MakeIdentity4x4();
 
 	// Sprite用もWVP用と同様にMatrix4x4 2つ分 のサイズ(128バイト)を用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteTransformMatrixResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
-	Matrix4x4* transformMatrixDataSprite = nullptr;
+	Matrix4x4* spriteTransformMatrixData = nullptr;
 
 	// 書き込むためのアドレスを取得
-	transformMatrixResourceSprite.Get()->Map(0, nullptr, reinterpret_cast<void**>(&transformMatrixDataSprite));
+	spriteTransformMatrixResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&spriteTransformMatrixData));
 
 	// 1つ目の行列(wvp用)に単位行列を書き込む
-	*transformMatrixDataSprite = MathUtils::MakeIdentity4x4();
+	*spriteTransformMatrixData = MathUtils::MakeIdentity4x4();
 
 	// 2つ目の行列(world用)にも単位行列を書き込む(+1 して次のアドレスへ)
-	*(transformMatrixDataSprite + 1) = MathUtils::MakeIdentity4x4();
+	*(spriteTransformMatrixData + 1) = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1710,6 +1709,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 1頂点あたりのサイズ
 	planeModelVertexBufferView.StrideInBytes = sizeof(VertexData);
 
+	//=====================================
+	// Sprite用の頂点バッファビューを作成する
+	//=====================================
+
+	D3D12_VERTEX_BUFFER_VIEW spriteVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	spriteVertexBufferView.BufferLocation = spriteVertexResource->GetGPUVirtualAddress();
+
+	// 1頂点あたりのサイズ
+	spriteVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	// 使用するリソースのサイズは頂点4つ分のサイズ
+	spriteVertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
+
+#pragma endregion
+
+	//==============================
+	// IndexBufferViewSpriteの設定
+	//==============================
+
+#pragma region IndexBufferViewSpriteの設定
+
+	D3D12_INDEX_BUFFER_VIEW spriteIndexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	spriteIndexBufferView.BufferLocation = spriteIndexResource->GetGPUVirtualAddress();
+
+	// 使用するリソースのサイズはインデックス6つ分のサイズ
+	spriteIndexBufferView.SizeInBytes = sizeof(uint32_t) * 6;
+
+	// インデックスは uint32_t とする
+	spriteIndexBufferView.Format = DXGI_FORMAT_R32_UINT;
+
 #pragma endregion
 
 	//================================
@@ -1731,6 +1764,59 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 頂点データをリソースにコピー
 	std::memcpy(planeModelVertexData, planeModelData.vertices.data(), sizeof(VertexData) * planeModelData.vertices.size());
 	planeModelVertexResource.Get()->Unmap(0, nullptr);
+
+	// Sprite用の頂点データも書き込む //
+	VertexData* spriteVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	spriteVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&spriteVertexData));
+
+	// 幅 640、高さ 360 の矩形を左上原点(0, 0)基準で作成
+	float w = 640.0f;
+	float h = 360.0f;
+
+	// 左下
+	spriteVertexData[0].position = { 0.0f, h, 0.0f, 1.0f };
+	spriteVertexData[0].texcoord = { 0.0f, 1.0f };
+
+	// 左上
+	spriteVertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	spriteVertexData[1].texcoord = { 0.0f, 0.0f };
+
+	// 右下
+	spriteVertexData[2].position = { w, h, 0.0f, 1.0f };
+	spriteVertexData[2].texcoord = { 1.0f, 1.0f };
+
+	// 左上
+	spriteVertexData[3].position = { w, 0.0f, 0.0f, 1.0f };
+	spriteVertexData[3].texcoord = { 1.0f, 0.0f };
+
+	// 全頂点に対して法線を設定(Sprite用)
+	for (int i = 0; i < 4; i++) {
+		spriteVertexData[i].normal = { 0.0f, 0.0f, -1.0f };
+	}
+
+	// VertexResourceSpriteのアンマップ
+	spriteVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//=====================================
+	// SpriteIndexResourceにデータを書き込む
+	//=====================================
+
+#pragma region SpriteIndexResourceにデータを書き込む
+
+	// インデックスリソースにデータを書き込む
+	uint32_t* spriteIndexData = nullptr;
+
+	spriteIndexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&spriteIndexData));
+	spriteIndexData[0] = 0;
+	spriteIndexData[1] = 1;
+	spriteIndexData[2] = 2;
+	spriteIndexData[3] = 1;
+	spriteIndexData[4] = 3;
+	spriteIndexData[5] = 2;
 
 #pragma endregion
 
@@ -1769,7 +1855,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Transform変数の作成
 
 	// モデル用のTransformを作成する
-	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform modelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// Sprite用のTransformを作成する
+	Transform spriteTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f} };
 
 #pragma endregion
 
@@ -1823,6 +1912,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = CreateTextureResource(device.Get(), planeModelMetadata);
 
+	//==========================================
+	// Spriteのテクスチャを読み込む
+	//==========================================
+
+	DirectX::ScratchImage spriteMipImages = LoadTexture("resources/uvChecker.png");
+	const DirectX::TexMetadata& spriteMetadata = spriteMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteTextureResource = CreateTextureResource(device.Get(), spriteMetadata);
+
 #pragma endregion
 
 	//===========================
@@ -1837,6 +1936,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelIntermediateResource = UploadTextureData(planeModelTextureResource.Get(), planeModelMipImages, device.Get(), commandList.Get());
+	Microsoft::WRL::ComPtr<ID3D12Resource> spriteIntermediateResource = UploadTextureData(spriteTextureResource.Get(), spriteMipImages, device.Get(), commandList.Get());
 
 #pragma endregion
 
@@ -1864,15 +1964,37 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	planeModelSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
 
 	// SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE planeModelTextureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE planeModelTextureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU1 = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU1 = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
 	// 先頭はImGuiが使っているのでその次を使う
-	planeModelTextureSrvHandleCPU.ptr += descriptorSizeSRV;
-	planeModelTextureSrvHandleGPU.ptr += descriptorSizeSRV;
+	textureSrvHandleCPU1.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU1.ptr += descriptorSizeSRV;
 
 	// SRVを作成(インデックス1の場所に書き込まれる)
-	device->CreateShaderResourceView(planeModelTextureResource.Get(), &planeModelSrvDesc, planeModelTextureSrvHandleCPU);
+	device->CreateShaderResourceView(planeModelTextureResource.Get(), &planeModelSrvDesc, textureSrvHandleCPU1);
+
+	//===========================================
+	// SpriteのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC spriteSrvDesc{};
+	spriteSrvDesc.Format = spriteMetadata.format;
+	spriteSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	spriteSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	spriteSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス1(textureSrvHandleCPU1)の次の場所(インデックス2)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = textureSrvHandleCPU1;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = textureSrvHandleGPU1;
+
+	textureSrvHandleCPU2.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU2.ptr += descriptorSizeSRV;
+
+	// SRVを作成
+	device->CreateShaderResourceView(spriteTextureResource.Get(), &spriteSrvDesc, textureSrvHandleCPU2);
 
 #pragma endregion
 
@@ -1906,6 +2028,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 0: plane.obj, 1: axis.obj
 	int currentModelIndex = 0;
+	bool isSpriteVisible = true;
 
 	//=====================
 	// メインループ
@@ -1942,72 +2065,128 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 			ImGui::Begin("Settings");
 
-			// カメラ切り替え用UI
-			ImGui::Separator();
-			ImGui::Text("- Camera -");
-			ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+			//===========================================
+			// Camera セクション
+			//===========================================
 
-			// デバッグカメラのリセットボタン
-			if (useDebugCamera) {
-				if (ImGui::Button("Reset Debug Camera")) {
-					debugCamera->Reset();
+			if (ImGui::CollapsingHeader("Camera")) {
+
+				// デバッグカメラへの切り替え
+				ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+
+				// デバッグカメラのリセット
+				if (useDebugCamera) {
+					if (ImGui::Button("Reset Debug Camera")) {
+						debugCamera->Reset();
+					}
 				}
 			}
 
-			ImGui::Separator();
+			//===========================================
+			// Model セクション
+			//===========================================
 
-			// モデルのトランスフォーム操作UI
-			ImGui::Text("-Model (plane.obj) Transform-");
+			if (ImGui::CollapsingHeader("Model Object", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-			// 各軸の回転を操作するスライダー
-			ImGui::SliderFloat3("Model Rotation", &transform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+				// モデル選択
+				ImGui::Text("-Select Model-");
+				ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
+				ImGui::RadioButton("Suzanne (suzanne.obj)", &currentModelIndex, 1);
 
-			ImGui::DragFloat3("Model Scale", &transform.scale.x, 0.1f);
+				ImGui::Separator();
 
-			// リセット時の値をY軸180度にする
-			if (ImGui::Button("Reset Rotation")) {
-				// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
-				transform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+				// Model Transform
+				ImGui::Text("-Transform-");
+				ImGui::DragFloat3("Translate", &modelTransform.translate.x, 0.01f);
+				ImGui::DragFloat3("Rotate", &modelTransform.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &modelTransform.scale.x, 0.01f);
+
+				if (ImGui::Button("Reset Model Transform")) {
+					modelTransform.translate = { 0.0f, 0.0f, 0.0f };
+					modelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+					modelTransform.scale = { 1.0f, 1.0f, 1.0f };
+				}
+
+				// Model Material
+				if (ImGui::TreeNode("Model Material")) {
+					ImGui::ColorEdit3("Model Color", &planeModelMaterialData->color.x);
+					ImGui::TreePop();
+				}
 			}
 
-			ImGui::Separator();
+			//===========================================
+			// Light セクション
+			//===========================================
 
-			// SpriteのUV座標系を動かせる
-			ImGui::Text("UV Transform");
-			ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
+			if (ImGui::CollapsingHeader("Light")) {
 
-			ImGui::Separator();
+				ImGui::ColorEdit3("Light Color", &directionalLightData->color.x);
+				ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 10.0f);
 
-			// モデルの切り替えラジオボタン
-			ImGui::Text("-Select Model-");
-			ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
-			ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
+				if (ImGui::DragFloat3("Light Direction", &directionalLightData->direction.x, 0.01f)) {
+					directionalLightData->direction = MathUtils::Normalize(directionalLightData->direction);
+				}
 
-			ImGui::Separator();
+				// Lightのリセットボタン
+				if (ImGui::Button("Reset Light Settings")) {
+					directionalLightData->color.x = 1.0f;
+					directionalLightData->color.y = 1.0f;
+					directionalLightData->color.z = 1.0f;
+					directionalLightData->intensity = 1.0f;
 
-			// 色編集用のImGui
-			ImGui::ColorEdit3("Sphere Color", &planeModelMaterialData->color.x);
-
-			ImGui::Separator();
-
-			// ライトの設定
-			ImGui::Text("Directional Light");
-
-			// ライトの色変更
-			ImGui::ColorEdit3("Light Color", &directionalLightData->color.x);
-
-			// ライトの輝度(0.0 ~ 10.0 程度まで動かせるように設定)
-			ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 10.0f);
-
-			// ライトの向き(-10.0 ~ 10.0 の範囲で動かす)
-			if (ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -10.0f, 10.0f)) {
-
-				// 値が変わったら毎回正規化する
-				directionalLightData->direction = MathUtils::Normalize(directionalLightData->direction);
+					// 起動時と同じ「真下を向く方向」に設定
+					directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
+				}
 			}
 
+			//===========================================
+			// Sprite セクション
+			//===========================================
+
+			if (ImGui::CollapsingHeader("Sprite Object", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::Checkbox("Toggling Sprite Display", &isSpriteVisible);
+
+				ImGui::Separator();
+
+				// Sprite Transform
+				ImGui::Text("-Transform-");
+				ImGui::DragFloat3("Translate##SpriteTranslate", &spriteTransform.translate.x, 1.0f);
+				ImGui::DragFloat3("Rotate##SpriteRotate", &spriteTransform.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale##SpriteScale", &spriteTransform.scale.x, 0.01f);
+
+				if (ImGui::Button("Reset Sprite Transform")) {
+					spriteTransform.translate = { 0.0f, 0.0f, 0.0f };
+					spriteTransform.rotate = { 0.0f, 0.0f, 0.0f };
+					spriteTransform.scale = { 1.0f, 1.0f, 1.0f };
+				}
+
+				// Sprite Material & UV
+				if (ImGui::TreeNode("Sprite Material & UV")) {
+					ImGui::ColorEdit3("Sprite Color", &spriteMaterialData->color.x);
+
+					ImGui::Separator();
+
+					ImGui::Text("[UV Transform]");
+					ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+					ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
+					ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+
+					// Material & UV Transform のリセットボタン
+					if (ImGui::Button("Reset Material & UV")) {
+
+						// マテリアルカラーを白(1.0f, 1.0f, 1.0f)にリセット
+						spriteMaterialData->color.x = 1.0f;
+						spriteMaterialData->color.y = 1.0f;
+						spriteMaterialData->color.z = 1.0f;
+
+						// UV Transform を初期値にリセット
+						uvTransformSprite.translate = { 0.0f, 0.0f };
+						uvTransformSprite.rotate = { 0.0f, 0.0f, 0.0f };
+						uvTransformSprite.scale = { 1.0f, 1.0f };
+					}
+					ImGui::TreePop();
+				}
+			}
 			ImGui::End();
 #endif
 
@@ -2037,8 +2216,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// === データの計算・定数バッファの更新 === //
 
+			//============================
+			// UVTransform行列の作成と更新
+			//============================
+
+			// UVTransform行列の作成
+			Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
+			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(uvTransformSprite.rotate.z));
+			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
+
+			//==============================================
+			// Model用のWorldViewProjectionMatrixを作成する
+			//==============================================
+
 			// WorldMatrixを作成
-			Matrix4x4 modelWorldMatrix = MathUtils::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			Matrix4x4 modelWorldMatrix = MathUtils::MakeAffineMatrix(modelTransform.scale, modelTransform.rotate, modelTransform.translate);
 
 			// ビュー行列と射影行列の宣言
 			Matrix4x4 modelViewMatrix;
@@ -2060,19 +2252,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			Matrix4x4 modelWorldViewProjectionMatrix = MathUtils::Multiply(matModelWV, modelProjectionMatrix);
 
 			// CBufferの中身を更新
-			*wvpPlaneModelData = modelWorldViewProjectionMatrix;
-
-			// UVTransform行列の作成と更新
-			Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
-			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(uvTransformSprite.rotate.z));
-			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
-
-			if (currentModelIndex == 0) {
-				planeModelMaterialData->uvTransform = uvTransformMatrix;
-			}
+			*planeModelWvpData = modelWorldViewProjectionMatrix;
 
 			// 描画用の頂点数を決定
 			UINT activeVertexCount = static_cast<UINT>(planeModelData.vertices.size());
+
+			//==============================================
+			// Sprite用のWorldViewProjectionMatrixを作成する
+			//==============================================
+
+			Matrix4x4 spriteWorldMatrix = MathUtils::MakeAffineMatrix(spriteTransform.scale, spriteTransform.rotate, spriteTransform.translate);
+
+			Matrix4x4 spriteViewMatrix = MathUtils::MakeIdentity4x4();
+
+			// 正射影行列の生成
+			Matrix4x4 spriteProjectionMatrix = MathUtils::MakeOrthographicMatrix(
+				0.0f, 0.0f,
+				static_cast<float>(kClientWidth),
+				static_cast<float>(kClientHeight),
+				0.0f, 100.0f
+			);
+
+			Matrix4x4 spriteWorldViewProjectionMatrix = MathUtils::Multiply(spriteWorldMatrix, MathUtils::Multiply(spriteViewMatrix, spriteProjectionMatrix));
+
+			// Sprite用のCBufferの中身を更新する
+			*spriteTransformMatrixData = spriteWorldViewProjectionMatrix;
+
+			// Sprite用マテリアルへ直接書き込み(planeモデルには反映しない)
+			spriteMaterialData->uvTransform = uvTransformMatrix;
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -2148,18 +2355,43 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
 
 			// 共通のWVP行列設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpPlaneModelResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, planeModelWvpResource.Get()->GetGPUVirtualAddress());
 
 			// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】を切り替える
 			if (currentModelIndex == 0) {
 				// Plane.obj の描画設定
 				commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
 				commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
-				commandList->SetGraphicsRootDescriptorTable(2, planeModelTextureSrvHandleGPU);
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
 			}
 
 			// 確定した正しい頂点数(activeVertexCount)で描画する
 			commandList->DrawInstanced(activeVertexCount, 1, 0, 0);
+
+			//==========================================
+			// Sprite(2D)の描画設定
+			//==========================================
+
+			if (isSpriteVisible) {
+
+				// マテリアルの設定
+				commandList->SetGraphicsRootConstantBufferView(0, spriteMaterialResource->GetGPUVirtualAddress());
+
+				// Sprite用のVBVを設定(これで三角形のVBVが上書きされる)
+				commandList->IASetVertexBuffers(0, 1, &spriteVertexBufferView);
+
+				// IBVを設定
+				commandList->IASetIndexBuffer(&spriteIndexBufferView);
+
+				// Sprite用のWVP行列CBVを設定(これで三角形のCBVが上書きされる)
+				commandList->SetGraphicsRootConstantBufferView(1, spriteTransformMatrixResource->GetGPUVirtualAddress());
+
+				// テクスチャの設定
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
+
+				// Spriteの描画コマンド!!(DrawCall) 6個のインデックスを使用し、1つのインスタンスを描画
+				commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			}
 
 			// 実際のcommandListのImGui描画コマンドを積む
 #ifdef USE_IMGUI
