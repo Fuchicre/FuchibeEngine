@@ -123,12 +123,19 @@ struct DirectionalLight {
 // マテリアルデータ
 struct MaterialData {
 	std::string textureFilePath;
+	// このマテリアルで描画する頂点数
+	uint32_t vertexCount = 0;
+	// 頂点バッファ内の開始位置
+	uint32_t vertexStartIndex = 0;
 };
 
 // モデルデータ
 struct ModelData {
 	std::vector<VertexData> vertices;
+	// 単一マテリアル用
 	MaterialData material;
+	// 複数マテリアル対応用
+	std::vector<MaterialData> materials;
 };
 
 struct D3DResourceLeakChecker {
@@ -271,7 +278,6 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(
 	assert(SUCCEEDED(hr));
 
 	return descriptorHeap;
-
 }
 
 //====================
@@ -529,7 +535,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTexture(
 	assert(SUCCEEDED(hr));
 
 	return resource;
-
 }
 
 #pragma endregion
@@ -648,6 +653,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	// ファイルから読み込んだ1行を格納するもの
 	std::string line;
 
+	// マテリアル定義(.mtl)の情報を一時保持するマップ
+	std::unordered_map<std::string, std::string> materialMap;
+
 	// ②ファイルを開く //
 
 	std::ifstream file(directoryPath + "/" + filename);
@@ -688,6 +696,23 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			// 法線のX座標を反転させる
 			normal.x *= -1.0f;
 			normals.push_back(normal);
+
+			// マテリアルの切り替え
+		} else if (identifier == "usemtl") {
+
+			std::string useMaterialName;
+			s >> useMaterialName;
+
+			// 新しいマテリアルグループを開始
+			MaterialData matData;
+
+			// デフォルトのテクスチャ名推測、またはmtl解析値
+			matData.textureFilePath = directoryPath + "/" + useMaterialName + ".png";
+			matData.vertexStartIndex = static_cast<uint32_t>(modelData.vertices.size());
+			matData.vertexCount = 0;
+
+			modelData.materials.push_back(matData);
+
 		} else if (identifier == "f") {
 
 			VertexData triangle[3];
@@ -719,6 +744,12 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
+
+			// 現在アクティブなマテリアルグループの頂点数を加算(+3)
+			if (!modelData.materials.empty()) {
+				modelData.materials.back().vertexCount += 3;
+			}
+
 		} else if (identifier == "mtllib") {
 
 			// materialTemplateLibraryファイルの名前を取得する
@@ -729,6 +760,16 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
 		}
 	}
+
+	// マテリアル(usemtl)が1つも指定されていなかった場合のバックアップ処理
+	if (modelData.materials.empty()) {
+		MaterialData defaultMat;
+		defaultMat.textureFilePath = modelData.material.textureFilePath;
+		defaultMat.vertexStartIndex = 0;
+		defaultMat.vertexCount = static_cast<uint32_t>(modelData.vertices.size());
+		modelData.materials.push_back(defaultMat);
+	}
+
 	// ④modelDataを返す //
 	return modelData;
 }
@@ -1308,7 +1349,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// VertexShaderで使う
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-	// レジスタ番号0を使う
+	// レジスタ番号1を使う
 	rootParameters[1].Descriptor.ShaderRegister = 1;
 
 	// DescriptorTableを使う
@@ -1546,14 +1587,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region VertexResourceの生成
 
 //====================================
-// 「plane.obj」のモデルとテクスチャ
+// 「plane.obj」モデルの読み込み
 //====================================
 
-	// 「plane.obj」モデルの読み込み
 	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
 
 	// 「plane.obj」モデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
+
+	//=========================
+	// 「teapot.obj」の読み込み
+	//=========================
+
+	ModelData teapotModelData = LoadObjFile("resources", "teapot.obj");
+
+	// 「teapot.obj」モデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * teapotModelData.vertices.size());
+
+	//=========================
+	// 「bunny.obj」の読み込み
+	//=========================
+
+	ModelData bunnyModelData = LoadObjFile("resources", "bunny.obj");
+
+	// 「bunny.obj」モデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * bunnyModelData.vertices.size());
+
+	//=============================
+	// 「MultiMesh.obj」の読み込み
+	//=============================
+
+	ModelData multiMeshModelData = LoadObjFile("resources", "multiMesh.obj");
+
+	// 「multiMesh.obj」モデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * multiMeshModelData.vertices.size());
+
+	//================================
+	// 「MultiMaterial.obj」の読み込み
+	//================================
+
+	ModelData multiMaterialModelData = LoadObjFile("resources", "multiMaterial.obj");
+
+	// 「multiMaterial.obj」モデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * multiMaterialModelData.vertices.size());
 
 	//====================
 	// Sphere
@@ -1584,10 +1660,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region PlaneModelMaterialResourceの生成
 
-	//===========================
-	// 「plane.obj」のマテリアル
-	//===========================
-
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
@@ -1605,6 +1677,122 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	planeModelMaterialData->lightingMode = 0;
 	planeModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//===================================
+	// TeapotModelMaterialResourceの生成
+	//===================================
+
+#pragma region TeapotModelMaterialResourceの生成
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* teapotModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	teapotModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&teapotModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	teapotModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	teapotModelMaterialData->lightingMode = 0;
+	teapotModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//===================================
+	// BunnyModelMaterialResourceの生成
+	//===================================
+
+#pragma region BunnyModelMaterialResourceの生成
+
+	//===========================
+	// 「bunny.obj」のマテリアル
+	//===========================
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* bunnyModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	bunnyModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&bunnyModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	bunnyModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	bunnyModelMaterialData->lightingMode = 0;
+	bunnyModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//=======================================
+	// MultiMeshModelMaterialResourceの生成
+	//=======================================
+
+#pragma region MultiMeshModelMaterialResourceの生成
+
+	//==============================
+	// 「multiMesh.obj」のマテリアル
+	//==============================
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* multiMeshModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	multiMeshModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMeshModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	multiMeshModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	multiMeshModelMaterialData->lightingMode = 0;
+	multiMeshModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//===========================================
+	// MultiMaterialModelMaterialResourceの生成
+	//===========================================
+
+#pragma region MultiMaterialModelMaterialResourceの生成
+
+	//==================================
+	// 「multiMaterial.obj」のマテリアル
+	//==================================
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* multiMaterialModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	multiMaterialModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMaterialModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	multiMaterialModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	multiMaterialModelMaterialData->lightingMode = 0;
+	multiMaterialModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1714,6 +1902,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region TransformMatrixResourceの生成
 
+	//================================
+	// planeModelWvpResourceの生成
+	//================================
+
+#pragma region planeModelWvpResourceの生成
+
 	// 「plane.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
@@ -1729,9 +1923,105 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
 	*(planeModelWvpData + 1) = MathUtils::MakeIdentity4x4();
 
+#pragma endregion
+
+	//================================
+	// teapotModelWvpResourceの生成
+	//================================
+
+#pragma region teapotModelWvpResourceの生成
+
+	// 「teapot.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+
+	// データを書き込む
+	Matrix4x4* teapotModelWvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	teapotModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&teapotModelWvpData));
+
+	// HLSL側のwvpに単位行列を書き込む
+	*teapotModelWvpData = MathUtils::MakeIdentity4x4();
+
+	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
+	*(teapotModelWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//================================
+	// bunnyModelWvpResourceの生成
+	//================================
+
+#pragma region bunnyModelWvpResourceの生成
+
+	// 「bunny.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+
+	// データを書き込む
+	Matrix4x4* bunnyModelWvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	bunnyModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&bunnyModelWvpData));
+
+	// HLSL側のwvpに単位行列を書き込む
+	*bunnyModelWvpData = MathUtils::MakeIdentity4x4();
+
+	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
+	*(bunnyModelWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//==================================
+	// multiMeshModelWvpResourceの生成
+	//==================================
+
+#pragma region multiMeshModelWvpResourceの生成
+
+	// 「multiMesh.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+
+	// データを書き込む
+	Matrix4x4* multiMeshModelWvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	multiMeshModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMeshModelWvpData));
+
+	// HLSL側のwvpに単位行列を書き込む
+	*multiMeshModelWvpData = MathUtils::MakeIdentity4x4();
+
+	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
+	*(multiMeshModelWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//=====================================
+	// multiMaterialModelWvpResourceの生成
+	//=====================================
+
+#pragma region multiMaterialModelWvpResourceの生成
+
+	// 「multiMaterial.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+
+	// データを書き込む
+	Matrix4x4* multiMaterialModelWvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	multiMaterialModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMaterialModelWvpData));
+
+	// HLSL側のwvpに単位行列を書き込む
+	*multiMaterialModelWvpData = MathUtils::MakeIdentity4x4();
+
+	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
+	*(multiMaterialModelWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
 	//====================================
 	// SphereMatrixResourceの生成
 	//====================================
+
+#pragma region SphereMatrixResourceの生成
 
 	// SphereのWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> sphereWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
@@ -1747,6 +2037,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
 	*(sphereWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+	//====================================
+	// SpriteMatrixResourceの生成
+	//====================================
+
+#pragma region SpriteMatrixResourceの生成
 
 	// Sprite用もWVP用と同様にMatrix4x4 2つ分 のサイズ(128バイト)を用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> spriteTransformMatrixResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
@@ -1765,15 +2061,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+#pragma endregion
+
+#pragma endregion
+
 	//===========================
 	// VertexBafferViewの設定
 	//===========================
 
 #pragma region VertexBafferViewの設定
 
-	//=======================
-	// 「plane.obj」モデル
-	//=======================
+	//=========================================
+	// planeModel用の頂点バッファビューを作成する
+	//=========================================
+
+#pragma region planeModelVertexBufferView
 
 	// 「plane.obj」モデルの頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW planeModelVertexBufferView{};
@@ -1787,15 +2089,93 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 1頂点あたりのサイズ
 	planeModelVertexBufferView.StrideInBytes = sizeof(VertexData);
 
+#pragma endregion
+
+	//=========================================
+	// teapotModel用の頂点バッファビューを作成する
+	//=========================================
+
+#pragma region teapotModelVertexBufferView
+
+	// 「teapot.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW teapotModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	teapotModelVertexBufferView.BufferLocation = teapotModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	teapotModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * teapotModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	teapotModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
+	//=========================================
+	// bunnyModel用の頂点バッファビューを作成する
+	//=========================================
+
+#pragma region bunnyModelModelVertexBufferView
+
+	// 「bunnyModel.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW bunnyModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	bunnyModelVertexBufferView.BufferLocation = bunnyModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	bunnyModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * bunnyModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	bunnyModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
+	//============================================
+	// multiMeshModel用の頂点バッファビューを作成する
+	//============================================
+
+#pragma region multiMeshModelVertexBufferView
+
+	// 「multiMesh.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW multiMeshModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	multiMeshModelVertexBufferView.BufferLocation = multiMeshModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	multiMeshModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * multiMeshModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	multiMeshModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
+	//=================================================
+	// multiMaterialModel用の頂点バッファビューを作成する
+	//=================================================
+
+#pragma region multiMaterialModelVertexBufferView
+
+	// 「multiMaterial.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW multiMaterialModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	multiMaterialModelVertexBufferView.BufferLocation = multiMaterialModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	multiMaterialModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * multiMaterialModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	multiMaterialModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
 	//=====================================
 	// Sphere用の頂点バッファビューを作成する
 	//=====================================
 
-	//===========================
-	// VertexBafferViewの設定
-	//===========================
-
-#pragma region VertexBafferViewの設定
+#pragma region Sphere用の頂点バッファビューを作成する
 
 	// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW sphereVertexBufferView{};
@@ -1815,6 +2195,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Sprite用の頂点バッファビューを作成する
 	//=====================================
 
+#pragma region Sprite用の頂点バッファビューを作成する
+
 	D3D12_VERTEX_BUFFER_VIEW spriteVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
@@ -1828,11 +2210,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+#pragma endregion
+
 	//==============================
-	// IndexBufferViewSpriteの設定
+	// SpriteIndexBufferViewの設定
 	//==============================
 
-#pragma region IndexBufferViewSpriteの設定
+#pragma region SpriteIndexBufferViewの設定
 
 	D3D12_INDEX_BUFFER_VIEW spriteIndexBufferView{};
 
@@ -1853,11 +2237,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region Resourceに頂点データを書きこむ
 
-	//=======================
-	// 「plane.obj」のモデル
-	//=======================
+	//=========================================
+	// plane.objの頂点リソースにデータを書き込む
+	//=========================================
 
-	// 「plane.obj」モデルの頂点リソースにデータを書き込む
+#pragma region plane.objの頂点リソースにデータを書き込む
+
 	VertexData* planeModelVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
@@ -1867,7 +2252,82 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	std::memcpy(planeModelVertexData, planeModelData.vertices.data(), sizeof(VertexData) * planeModelData.vertices.size());
 	planeModelVertexResource.Get()->Unmap(0, nullptr);
 
-	// Sprite用の頂点データも書き込む //
+#pragma endregion
+
+	//=========================================
+	// teapot.objの頂点リソースにデータを書き込む
+	//=========================================
+
+#pragma region teapot.objの頂点リソースにデータを書き込む
+
+	VertexData* teapotModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	teapotModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&teapotModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(teapotModelVertexData, teapotModelData.vertices.data(), sizeof(VertexData) * teapotModelData.vertices.size());
+	teapotModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//=========================================
+	// bunny.objの頂点リソースにデータを書き込む
+	//=========================================
+
+#pragma region  bunny.objの頂点リソースにデータを書き込む
+
+	VertexData* bunnyModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	bunnyModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&bunnyModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(bunnyModelVertexData, bunnyModelData.vertices.data(), sizeof(VertexData) * bunnyModelData.vertices.size());
+	bunnyModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//============================================
+	// multiMesh.objの頂点リソースにデータを書き込む
+	//============================================
+
+#pragma region multiMesh.objの頂点リソースにデータを書き込む
+
+	VertexData* multiMeshModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	multiMeshModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMeshModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(multiMeshModelVertexData, multiMeshModelData.vertices.data(), sizeof(VertexData) * multiMeshModelData.vertices.size());
+	multiMeshModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//===============================================
+	// multiMaterial.objの頂点リソースにデータを書き込む
+	//===============================================
+
+#pragma region multiMaterial.objの頂点リソースにデータを書き込む
+
+	VertexData* multiMaterialModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	multiMaterialModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&multiMaterialModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(multiMaterialModelVertexData, multiMaterialModelData.vertices.data(), sizeof(VertexData) * multiMaterialModelData.vertices.size());
+	multiMaterialModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//===============================
+	// Sprite用の頂点データを書き込む
+	//===============================
+
+#pragma region Sprite用の頂点データを書き込む
+
 	VertexData* spriteVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
@@ -1903,7 +2363,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-#pragma region SphereResourceに頂点データを書きこむ
+	//===============================
+	// Sphere用の頂点データを書き込む
+	//===============================
+
+#pragma region Sphere用の頂点データを書き込む
 
 	// 頂点リソースにデータを書き込む
 	VertexData* sphereVertexData = nullptr;
@@ -2005,6 +2469,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+#pragma endregion
+
 	//==================================
 	// ViewportとScissorRectの設定
 	//==================================
@@ -2039,10 +2505,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region Transform変数の作成
 
-	// モデル用のTransformを作成する
-	Transform modelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+	// plane.obj用のTransformを作成する
+	Transform planeModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
+	// Sphere用のTransformを作成する
 	Transform sphereTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// teapot.obj用のTransformを作成する
+	Transform teapotModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// bunny.obj用のTransformを作成する
+	Transform bunnyModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// multiMesh.obj用のTransformを作成する
+	Transform multiMeshModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// multiMaterial.obj用のTransformを作成する
+	Transform multiMaterialModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	// Sprite用のTransformを作成する
 	Transform spriteTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f} };
@@ -2099,6 +2578,56 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = CreateTextureResource(device.Get(), planeModelMetadata);
 
+	//==========================================
+	// 「teapot.obj」のモデルのテクスチャを読み込む
+	//==========================================
+
+	DirectX::ScratchImage teapotModelMipImages = LoadTexture(teapotModelData.material.textureFilePath);
+	const DirectX::TexMetadata& teapotModelMetadata = teapotModelMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelTextureResource = CreateTextureResource(device.Get(), teapotModelMetadata);
+
+	//==========================================
+	// 「bunny.obj」のモデルのテクスチャを読み込む
+	//==========================================
+
+	DirectX::ScratchImage bunnyModelMipImages = LoadTexture(bunnyModelData.material.textureFilePath);
+	const DirectX::TexMetadata& bunnyModelMetadata = bunnyModelMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelTextureResource = CreateTextureResource(device.Get(), bunnyModelMetadata);
+
+	//=============================================
+	// 「multiMesh.obj」のモデルのテクスチャを読み込む
+	//=============================================
+
+	DirectX::ScratchImage multiMeshModelMipImages = LoadTexture(multiMeshModelData.material.textureFilePath);
+	const DirectX::TexMetadata& multiMeshModelMetadata = multiMeshModelMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelTextureResource = CreateTextureResource(device.Get(), multiMeshModelMetadata);
+
+	//=================================================
+	// 「multiMaterial.obj」のモデルのテクスチャを読み込む
+	//=================================================
+
+	DirectX::ScratchImage multiMaterialModelMipImages = LoadTexture(multiMaterialModelData.material.textureFilePath);
+	const DirectX::TexMetadata& multiMaterialModelMetadata = multiMaterialModelMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelTextureResource = CreateTextureResource(device.Get(), multiMaterialModelMetadata);
+
+	//==========================================
+	// monsterBallのテクスチャを読み込む
+	//==========================================
+
+	DirectX::ScratchImage monsterBallMipImages = LoadTexture("resources/monsterBall.png");
+	const DirectX::TexMetadata& monsterBallMetadata = monsterBallMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> monsterBallTextureResource = CreateTextureResource(device.Get(), monsterBallMetadata);
+
 	//=============================
 	// Sphereのテクスチャを読み込む
 	//=============================
@@ -2127,9 +2656,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region コマンドを実行して完了を待つ
 
-	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
+	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る) //
+
+	// 「plane.obj」の転送
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelIntermediateResource = UploadTextureData(planeModelTextureResource.Get(), planeModelMipImages, device.Get(), commandList.Get());
+
+	// 「teapot.obj」の転送
+	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelIntermediateResource = UploadTextureData(teapotModelTextureResource.Get(), teapotModelMipImages, device.Get(), commandList.Get());
+
+	// 「bunny.obj」の転送
+	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelIntermediateResource = UploadTextureData(bunnyModelTextureResource.Get(), bunnyModelMipImages, device.Get(), commandList.Get());
+
+	// 「multiMesh.obj」の転送
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelIntermediateResource = UploadTextureData(multiMeshModelTextureResource.Get(), multiMeshModelMipImages, device.Get(), commandList.Get());
+
+	// 「multiMaterial.obj」の転送
+	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelIntermediateResource = UploadTextureData(multiMaterialModelTextureResource.Get(), multiMaterialModelMipImages, device.Get(), commandList.Get());
+
+	// 「monsterBall」の転送
+	Microsoft::WRL::ComPtr<ID3D12Resource> monsterBallIntermediateResource = UploadTextureData(monsterBallTextureResource.Get(), monsterBallMipImages, device.Get(), commandList.Get());
+
+	// 「sphere」の転送
 	Microsoft::WRL::ComPtr<ID3D12Resource> sphereIntermediateResource = UploadTextureData(sphereTextureResource.Get(), sphereMipImages, device.Get(), commandList.Get());
+
+	// 「sprite」の転送
 	Microsoft::WRL::ComPtr<ID3D12Resource> spriteIntermediateResource = UploadTextureData(spriteTextureResource.Get(), spriteMipImages, device.Get(), commandList.Get());
 
 #pragma endregion
@@ -2206,6 +2756,116 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス3の場所に書き込まれる)
 	device->CreateShaderResourceView(sphereTextureResource.Get(), &sphereSrvDesc, textureSrvHandleCPU3);
 
+	//===========================================
+	// teapotのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC teapotSrvDesc{};
+	teapotSrvDesc.Format = teapotModelMetadata.format;
+	teapotSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	teapotSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	teapotSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス3(textureSrvHandleCPU3)の次の場所(インデックス4)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU4 = textureSrvHandleCPU3;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU4 = textureSrvHandleGPU3;
+
+	textureSrvHandleCPU4.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU4.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス4の場所に書き込まれる)
+	device->CreateShaderResourceView(teapotModelTextureResource.Get(), &teapotSrvDesc, textureSrvHandleCPU4);
+
+	//===========================================
+	// bunnyのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC bunnySrvDesc{};
+	bunnySrvDesc.Format = bunnyModelMetadata.format;
+	bunnySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	bunnySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	bunnySrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス4(textureSrvHandleCPU4)の次の場所(インデックス5)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU5 = textureSrvHandleCPU4;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU5 = textureSrvHandleGPU4;
+
+	textureSrvHandleCPU5.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU5.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス5の場所に書き込まれる)
+	device->CreateShaderResourceView(bunnyModelTextureResource.Get(), &bunnySrvDesc, textureSrvHandleCPU5);
+
+	//===========================================
+	// multiMeshのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC multiMeshSrvDesc{};
+	multiMeshSrvDesc.Format = multiMeshModelMetadata.format;
+	multiMeshSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	multiMeshSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	multiMeshSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス5(textureSrvHandleCPU5)の次の場所(インデックス6)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU6 = textureSrvHandleCPU5;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU6 = textureSrvHandleGPU5;
+
+	textureSrvHandleCPU6.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU6.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス6の場所に書き込まれる)
+	device->CreateShaderResourceView(multiMeshModelTextureResource.Get(), &multiMeshSrvDesc, textureSrvHandleCPU6);
+
+	//===========================================
+	// multiMaterialのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC multiMaterialSrvDesc{};
+	multiMaterialSrvDesc.Format = multiMaterialModelMetadata.format;
+	multiMaterialSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	multiMaterialSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	multiMaterialSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス6(textureSrvHandleCPU6)の次の場所(インデックス7)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU7 = textureSrvHandleCPU6;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU7 = textureSrvHandleGPU6;
+
+	textureSrvHandleCPU7.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU7.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス7の場所に書き込まれる)
+	device->CreateShaderResourceView(multiMaterialModelTextureResource.Get(), &multiMaterialSrvDesc, textureSrvHandleCPU7);
+
+	//===========================================
+	// monsterBallのテクスチャのSRVを作成
+	//===========================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC monsterBallSrvDesc{};
+	monsterBallSrvDesc.Format = monsterBallMetadata.format;
+	monsterBallSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	monsterBallSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	monsterBallSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// インデックス7(textureSrvHandleCPU7)の次の場所(インデックス8)に配置するため、1つ分のアドレスを進める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU8 = textureSrvHandleCPU7;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU8 = textureSrvHandleGPU7;
+
+	textureSrvHandleCPU8.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU8.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス8の場所に書き込まれる)
+	device->CreateShaderResourceView(monsterBallTextureResource.Get(), &monsterBallSrvDesc, textureSrvHandleCPU8);
+
 	//================
 	// サウンドの再生
 	//================
@@ -2231,7 +2891,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ImGuiの切り替え用の変数
 	//=======================
 
-	// 0: plane.obj, 1: axis.obj
+	// 0: plane.obj
 	int currentModelIndex = 0;
 	bool isSpriteVisible = true;
 
@@ -2297,14 +2957,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				ImGui::Text("-Select Model-");
 				ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
 				ImGui::RadioButton("Sphere (sphere.obj)", &currentModelIndex, 1);
+				ImGui::RadioButton("Utah Teapot (teapot.obj)", &currentModelIndex, 2);
+				ImGui::RadioButton("Stanford Bunny (bunny.obj)", &currentModelIndex, 3);
+				ImGui::RadioButton("MultiMesh (multiMesh.obj)", &currentModelIndex, 4);
+				ImGui::RadioButton("MultiMaterial (multiMaterial.obj)", &currentModelIndex, 5);
 
 				// 選択中のモデルに応じてポインタを切り替え
-				Transform* currentTransform = &modelTransform;
+				Transform* currentTransform = &planeModelTransform;
 				Material* currentMaterialData = planeModelMaterialData;
 
-				if (currentModelIndex == 1) {
+				switch (currentModelIndex) {
+				case 0:
+					currentTransform = &planeModelTransform;
+					currentMaterialData = planeModelMaterialData;
+					break;
+				case 1:
 					currentTransform = &sphereTransform;
 					currentMaterialData = sphereMaterialData;
+					break;
+				case 2:
+					currentTransform = &teapotModelTransform;
+					currentMaterialData = teapotModelMaterialData;
+					break;
+				case 3:
+					currentTransform = &bunnyModelTransform;
+					currentMaterialData = bunnyModelMaterialData;
+					break;
+				case 4:
+					currentTransform = &multiMeshModelTransform;
+					currentMaterialData = multiMeshModelMaterialData;
+					break;
+				case 5:
+					currentTransform = &multiMaterialModelTransform;
+					currentMaterialData = multiMaterialModelMaterialData;
+					break;
 				}
 
 				ImGui::Separator();
@@ -2317,13 +3003,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				if (ImGui::Button("Reset Model Transform")) {
 					if (currentModelIndex == 1) {
+						// Sphere
 						sphereTransform.translate = { 0.0f, 0.0f, 0.0f };
 						sphereTransform.rotate = { 0.0f, 0.0f, 0.0f };
 						sphereTransform.scale = { 1.0f, 1.0f, 1.0f };
+					} else if (currentModelIndex == 0) {
+						// Plane
+						planeModelTransform.translate = { 0.0f, 0.0f, 0.0f };
+						planeModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+						planeModelTransform.scale = { 1.0f, 1.0f, 1.0f };
+					} else if (currentModelIndex == 4) {
+						// multiMesh
+						multiMeshModelTransform.translate = { 0.0f, 0.0f, 0.0f };
+						multiMeshModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+						multiMeshModelTransform.scale = { 1.0f, 1.0f, 1.0f };
+					} else if (currentModelIndex == 5) {
+						// multiMaterial
+						multiMaterialModelTransform.translate = { 0.0f, 0.0f, 0.0f };
+						multiMaterialModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+						multiMaterialModelTransform.scale = { 1.0f, 1.0f, 1.0f };
 					} else {
-						modelTransform.translate = { 0.0f, 0.0f, 0.0f };
-						modelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
-						modelTransform.scale = { 1.0f, 1.0f, 1.0f };
+						currentTransform->translate = { 0.0f, 0.0f, 0.0f };
+						currentTransform->rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+						currentTransform->scale = { 1.0f, 1.0f, 1.0f };
 					}
 				}
 
@@ -2332,6 +3034,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				// カラー編集
 				ImGui::ColorEdit3("Model Color", &currentMaterialData->color.x);
+
+				// マテリアルカラーのリセットボタン
+				if (ImGui::Button("Reset Model Material")) {
+					// 白(RGBA: 1, 1, 1, 1)にリセット
+					currentMaterialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+				}
 
 				ImGui::Separator();
 				ImGui::Text("-Lighting Model-");
@@ -2463,22 +3171,43 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				modelProjectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
 			}
 
-			// 3Dモデル(Plane / Sphere)のWVP・World行列更新
-			if (currentModelIndex == 1) {
-				Matrix4x4 sphereWorldMatrix = MathUtils::MakeAffineMatrix(sphereTransform.scale, sphereTransform.rotate, sphereTransform.translate);
-				Matrix4x4 matSphereWV = MathUtils::Multiply(sphereWorldMatrix, modelViewMatrix);
-				Matrix4x4 sphereWvpMatrix = MathUtils::Multiply(matSphereWV, modelProjectionMatrix);
+			// 3Dモデル(Plane / Sphere / Teapot / Bunny / MultiMesh / MultiMaterial)のWVP・World行列更新
+			Transform* activeTransform = &planeModelTransform;
+			Matrix4x4* activeWvpData = planeModelWvpData;
 
-				sphereWvpData[0] = sphereWvpMatrix;
-				sphereWvpData[1] = sphereWorldMatrix;
-			} else {
-				Matrix4x4 modelWorldMatrix = MathUtils::MakeAffineMatrix(modelTransform.scale, modelTransform.rotate, modelTransform.translate);
-				Matrix4x4 matModelWV = MathUtils::Multiply(modelWorldMatrix, modelViewMatrix);
-				Matrix4x4 modelWvpMatrix = MathUtils::Multiply(matModelWV, modelProjectionMatrix);
-
-				planeModelWvpData[0] = modelWvpMatrix;
-				planeModelWvpData[1] = modelWorldMatrix;
+			switch (currentModelIndex) {
+			case 0:
+				activeTransform = &planeModelTransform;
+				activeWvpData = planeModelWvpData;
+				break;
+			case 1:
+				activeTransform = &sphereTransform;
+				activeWvpData = sphereWvpData;
+				break;
+			case 2:
+				activeTransform = &teapotModelTransform;
+				activeWvpData = teapotModelWvpData;
+				break;
+			case 3:
+				activeTransform = &bunnyModelTransform;
+				activeWvpData = bunnyModelWvpData;
+				break;
+			case 4:
+				activeTransform = &multiMeshModelTransform;
+				activeWvpData = multiMeshModelWvpData;
+				break;
+			case 5:
+				activeTransform = &multiMaterialModelTransform;
+				activeWvpData = multiMaterialModelWvpData;
+				break;
 			}
+
+			Matrix4x4 activeWorldMatrix = MathUtils::MakeAffineMatrix(activeTransform->scale, activeTransform->rotate, activeTransform->translate);
+			Matrix4x4 matActiveWV = MathUtils::Multiply(activeWorldMatrix, modelViewMatrix);
+			Matrix4x4 activeWvpMatrix = MathUtils::Multiply(matActiveWV, modelProjectionMatrix);
+
+			activeWvpData[0] = activeWvpMatrix;
+			activeWvpData[1] = activeWorldMatrix;
 
 			// 2D Sprite のWVP・World行列更新
 			Matrix4x4 spriteWorldMatrix = MathUtils::MakeAffineMatrix(spriteTransform.scale, spriteTransform.rotate, spriteTransform.translate);
@@ -2571,10 +3300,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
 
 				// Plane.obj の描画
-				commandList->DrawInstanced(vertexCount, 1, 0, 0);
+				commandList->DrawInstanced(static_cast<UINT>(planeModelData.vertices.size()), 1, 0, 0);
 
 			} else if (currentModelIndex == 1) {
-				// Sphere(球体)の描画設定
+				// Sphereの描画設定
 				commandList->SetGraphicsRootConstantBufferView(0, sphereMaterialResource.Get()->GetGPUVirtualAddress());
 				commandList->SetGraphicsRootConstantBufferView(1, sphereWvpResource.Get()->GetGPUVirtualAddress());
 				commandList->IASetVertexBuffers(0, 1, &sphereVertexBufferView);
@@ -2587,6 +3316,58 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				// インデックス(1536個)を使用して球体を描画
 				commandList->DrawIndexedInstanced(sphereIndexCount, 1, 0, 0, 0);
+
+			} else if (currentModelIndex == 2) {
+				// Utah Teapot(teapot.obj)の描画設定
+				commandList->SetGraphicsRootConstantBufferView(1, teapotModelWvpResource.Get()->GetGPUVirtualAddress());
+				commandList->SetGraphicsRootConstantBufferView(0, teapotModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &teapotModelVertexBufferView);
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU4);
+
+				// Teapot の描画
+				commandList->DrawInstanced(static_cast<UINT>(teapotModelData.vertices.size()), 1, 0, 0);
+
+			} else if (currentModelIndex == 3) {
+				// Stanford Bunny(bunny.obj)の描画設定
+				commandList->SetGraphicsRootConstantBufferView(1, bunnyModelWvpResource.Get()->GetGPUVirtualAddress());
+				commandList->SetGraphicsRootConstantBufferView(0, bunnyModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &bunnyModelVertexBufferView);
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU5);
+
+				// Bunny の描画
+				commandList->DrawInstanced(static_cast<UINT>(bunnyModelData.vertices.size()), 1, 0, 0);
+
+			} else if (currentModelIndex == 4) {
+				// MultiMesh(multiMesh.obj)の描画設定
+				commandList->SetGraphicsRootConstantBufferView(1, multiMeshModelWvpResource.Get()->GetGPUVirtualAddress());
+				commandList->SetGraphicsRootConstantBufferView(0, multiMeshModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &multiMeshModelVertexBufferView);
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU6);
+
+				// 全頂点を一括描画(分離せずに全オブジェクトを描画)
+				commandList->DrawInstanced(static_cast<UINT>(multiMeshModelData.vertices.size()), 1, 0, 0);
+
+			} else if (currentModelIndex == 5) {
+				// MultiMaterial(multiMaterial.obj)の描画設定
+				commandList->SetGraphicsRootConstantBufferView(1, multiMaterialModelWvpResource.Get()->GetGPUVirtualAddress());
+				commandList->SetGraphicsRootConstantBufferView(0, multiMaterialModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &multiMaterialModelVertexBufferView);
+
+				// materials 配列に2つ以上データがある場合は正しく分割して描画する
+				if (multiMaterialModelData.materials.size() >= 2) {
+
+					// 1つ目のオブジェクト(左)
+					commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
+					commandList->DrawInstanced(multiMaterialModelData.materials[0].vertexCount, 1, multiMaterialModelData.materials[0].vertexStartIndex, 0);
+
+					// 2つ目のオブジェクト(右)
+					commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU8);
+					commandList->DrawInstanced(multiMaterialModelData.materials[1].vertexCount, 1, multiMaterialModelData.materials[1].vertexStartIndex, 0);
+				} else {
+					// 分割数が足りない場合は全頂点を描画
+					commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
+					commandList->DrawInstanced(static_cast<UINT>(multiMaterialModelData.vertices.size()), 1, 0, 0);
+				}
 			}
 
 			//==========================================
