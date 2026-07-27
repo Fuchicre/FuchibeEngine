@@ -3253,11 +3253,109 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// フレームの先頭で入力を更新
 			//===================================
 
+			// 入力の更新
 			input->Update();
 
-			// 数字の0キーが押されていたら(トリガー処理)
-			if (input->IsTrigger(DIK_0)) {
-				OutputDebugStringA("hit 0\n");
+			// 現在選択されているモデルの Transform ポインタを取得
+			Transform* activeTransform = &planeModelTransform;
+
+			switch (currentModelIndex) {
+			case 0:
+				activeTransform = &planeModelTransform;
+				break;
+			case 1:
+				activeTransform = &sphereTransform;
+				break;
+			case 2:
+				activeTransform = &teapotModelTransform;
+				break;
+			case 3:
+				activeTransform = &bunnyModelTransform;
+				break;
+			case 4:
+				activeTransform = &multiMeshModelTransform;
+				break;
+			case 5:
+				activeTransform = &multiMaterialModelTransform;
+				break;
+			case 6:
+				activeTransform = &suzanneModelTransform;
+				break;
+			}
+
+			// Xboxコントローラーによる Transform 操作
+			if (input->IsGamepadConnected()) {
+
+				// 各種感度の設定 //
+
+				// 移動速度
+				const float moveSpeed = 0.05f;
+
+				// 回転速度
+				const float rotateSpeed = 0.03f;
+
+				// 拡大縮小速度
+				const float scaleSpeed = 0.01f;
+
+				Input::JoystickState leftStick = input->GetLeftStick();
+				Input::JoystickState rightStick = input->GetRightStick();
+
+				//===========================================
+				// 【Translate】(位置移動)
+				//===========================================
+
+				// 左スティック X/Y : X軸(左右)・Y軸(上下)移動
+				activeTransform->translate.x += leftStick.x * moveSpeed;
+				activeTransform->translate.y += leftStick.y * moveSpeed;
+
+				// RB / LB ボタン : Z軸(前後)移動
+
+				// RB
+				if (input->IsPressButton(XINPUT_GAMEPAD_RIGHT_SHOULDER)) {
+					activeTransform->translate.z += moveSpeed;
+				}
+
+				// LB
+				if (input->IsPressButton(XINPUT_GAMEPAD_LEFT_SHOULDER)) {
+					activeTransform->translate.z -= moveSpeed;
+				}
+
+				//===========================================
+				// 【Rotate】(回転)
+				//===========================================
+
+				// 右スティック X/Y : Y軸(左右回転)・X軸(上下ピッチ回転)
+				activeTransform->rotate.y += rightStick.x * rotateSpeed;
+
+				// 上下に傾ける操作感に合わせ反転
+				activeTransform->rotate.x -= rightStick.y * rotateSpeed;
+
+				// D-Pad(十字キー)左右 : Z軸(ロール回転)
+				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_RIGHT)) {
+					activeTransform->rotate.z -= rotateSpeed;
+				}
+
+				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_LEFT)) {
+					activeTransform->rotate.z += rotateSpeed;
+				}
+
+				//===========================================
+				// 【Scale】(拡大・縮小)
+				//===========================================
+
+				// D-Pad(十字キー)上/下 : 全軸均等スケール変更
+				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_UP)) {
+					activeTransform->scale.x += scaleSpeed;
+					activeTransform->scale.y += scaleSpeed;
+					activeTransform->scale.z += scaleSpeed;
+				}
+
+				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_DOWN)) {
+					// スケールが 0 以下にならないよう制限
+					activeTransform->scale.x = (std::max)(0.01f, activeTransform->scale.x - scaleSpeed);
+					activeTransform->scale.y = (std::max)(0.01f, activeTransform->scale.y - scaleSpeed);
+					activeTransform->scale.z = (std::max)(0.01f, activeTransform->scale.z - scaleSpeed);
+				}
 			}
 
 			// === デバッグカメラの更新(行列計算の前に呼び出す) === //
@@ -3298,7 +3396,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			// 3Dモデル(Plane / Sphere / Teapot / Bunny / MultiMesh / MultiMaterial)のWVP・World行列更新
-			Transform* activeTransform = &planeModelTransform;
 			Matrix4x4* activeWvpData = planeModelWvpData;
 
 			switch (currentModelIndex) {

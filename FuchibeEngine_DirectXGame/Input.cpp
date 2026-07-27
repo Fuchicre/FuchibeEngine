@@ -1,5 +1,6 @@
 #include "Input.h"
 #include <cassert>
+#include <cstdlib>
 
 /// <summary>
 /// DirectInputおよびキーボードデバイスの初期化処理
@@ -83,32 +84,6 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 /// <summary>
 /// 毎フレームの最初に入力状態を更新する処理
 /// </summary>
-//void Input::Update() {
-//
-//	// 新しい入力を得る前に、現在の入力状態を「1つ前のフレームの状態(preKey)」へ丸ごとコピーする
-//	// これにより、前フレームと現フレームの比較(トリガー判定)ができるようになる
-//	memcpy(preKey, key, sizeof(key));
-//
-//	// キーボード情報の取得開始
-//	keyboard->Acquire();
-//
-//	// 全キーの入力状態を取得する
-//	keyboard->GetDeviceState(sizeof(key), key);
-//
-//	// マウスの前フレーム状態を保存
-//	preMouseState = mouseState;
-//
-//	// マウス情報の取得開始
-//	mouse->Acquire();
-//
-//	// マウスの入力状態を取得する
-//	mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
-//}
-
-
-/// <summary>
-/// 毎フレームの最初に入力状態を更新する処理
-/// </summary>
 void Input::Update() {
 
 	// 新しい入力を得る前に、現在の入力状態を「1つ前のフレームの状態(preKey)」へ丸ごとコピーする
@@ -157,6 +132,17 @@ void Input::Update() {
 			memset(&mouseState, 0, sizeof(mouseState));
 		}
 	}
+
+	//================================
+	// コントローラー(XInput)情報の更新
+	//================================
+
+	preGamepadState = gamepadState;
+	ZeroMemory(&gamepadState, sizeof(XINPUT_STATE));
+
+	// プレイヤー1(インデックス 0)の接続状態とステータスを取得
+	DWORD dwResult = XInputGetState(0, &gamepadState);
+	isGamepadConnected = (dwResult == ERROR_SUCCESS);
 }
 
 /// <summary>
@@ -246,4 +232,149 @@ Input::MouseMove Input::GetMouseMove() const {
 	move.lY = mouseState.lY;
 	move.lZ = mouseState.lZ;
 	return move;
+}
+
+//=============================================================================
+// コントローラー(XInput)判定用関数群
+//=============================================================================
+
+/// <summary>
+/// 指定したコントローラーのボタンが現在「押されている状態」かを判定する
+/// </summary>
+/// <param name="button">XINPUT_GAMEPAD_A や XINPUT_GAMEPAD_RIGHT_SHOULDER などのボタンフラグ</param>
+/// <returns>押されていれば true、離されていれば false(非接続時は常に false)</returns>
+bool Input::IsPressButton(WORD button) const {
+
+	// コントローラーが接続されていない場合は処理を行わない
+	if (!isGamepadConnected) {
+		return false;
+	}
+
+	// wButtonsのビットフラグとAND演算を行い、対象のボタンが押されているか確認
+	return (gamepadState.Gamepad.wButtons & button) != 0;
+}
+
+/// <summary>
+/// 指定したコントローラーのボタンが「押された瞬間」かを判定する(トリガー判定)
+/// </summary>
+/// <param name="button">ボタンフラグ</param>
+/// <returns>前フレームで離されていて現フレームで押された瞬間なら true(非接続時は常に false)</returns>
+bool Input::IsTriggerButton(WORD button) const {
+
+	// コントローラーが接続されていない場合は処理を行わない
+	if (!isGamepadConnected) {
+		return false;
+	}
+
+	// 現在のフレームと1つ前のフレームにおける対象ボタンの押下状態を取得
+	bool current = (gamepadState.Gamepad.wButtons & button) != 0;
+	bool previous = (preGamepadState.Gamepad.wButtons & button) != 0;
+
+	// 「前フレームで押されていない」かつ「現フレームで押されている」場合のみ true を返す
+	return !previous && current;
+}
+
+/// <summary>
+/// コントローラーの左スティックの倒し具合を取得する
+/// </summary>
+/// <returns>X軸/Y軸ともに -1.0f ~ 1.0f の範囲に正規化されたスティック状態</returns>
+Input::JoystickState Input::GetLeftStick() const {
+
+	JoystickState state = { 0.0f, 0.0f };
+
+	// 非接続時は入力なし(0.0f)として返す
+	if (!isGamepadConnected) {
+		return state;
+	}
+
+	// XInputから生の入力値(-32768 ~ 32767)を取得
+	float x = gamepadState.Gamepad.sThumbLX;
+	float y = gamepadState.Gamepad.sThumbLY;
+
+	//==========================================================================
+	// デッドゾーン(遊び)処理
+	// スティックから手を離していても微小な傾きが発生するため、
+	// 規定の閾値(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)未満の値は 0.0f にカットする
+	//==========================================================================
+
+	if (std::abs(x) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) {
+		x = 0.0f;
+	}
+
+	if (std::abs(y) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) {
+		y = 0.0f;
+	}
+
+	//===============================================================
+	// -1.0f ~ 1.0f の範囲への正規化
+	// short型の最小値は -32768, 最大値は 32767 であるため、
+	// 正の値と負の値で除算する数値を分けて正確に 1.0f / -1.0f に収める
+	//===============================================================
+
+	// X軸の正規化
+	if (x > 0.0f) {
+		state.x = x / 32767.0f;
+	} else {
+		state.x = x / 32768.0f;
+	}
+
+	// Y軸の正規化
+	if (y > 0.0f) {
+		state.y = y / 32767.0f;
+	} else {
+		state.y = y / 32768.0f;
+	}
+
+	return state;
+}
+
+/// <summary>
+/// コントローラーの右スティックの倒し具合を取得する
+/// </summary>
+/// <returns>X軸/Y軸ともに -1.0f ~ 1.0f の範囲に正規化されたスティック状態</returns>
+Input::JoystickState Input::GetRightStick() const {
+
+	JoystickState state = { 0.0f, 0.0f };
+
+	// 非接続時は入力なし(0.0f)として返す
+	if (!isGamepadConnected) {
+		return state;
+	}
+
+	// XInputから生の入力値(-32768 ~ 32767)を取得
+	float x = gamepadState.Gamepad.sThumbRX;
+	float y = gamepadState.Gamepad.sThumbRY;
+
+	//====================================================================
+	// デッドゾーン(遊び)処理
+	// 右スティック固有の閾値(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)を使用する
+	//====================================================================
+
+	if (std::abs(x) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
+		x = 0.0f;
+	}
+
+	if (std::abs(y) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
+		y = 0.0f;
+	}
+
+	//==================================
+	// -1.0f ~ 1.0f の範囲への正規化
+	//==================================
+
+	// X軸の正規化
+	if (x > 0.0f) {
+		state.x = x / 32767.0f;
+	} else {
+		state.x = x / 32768.0f;
+	}
+
+	// Y軸の正規化
+	if (y > 0.0f) {
+		state.y = y / 32767.0f;
+	} else {
+		state.y = y / 32768.0f;
+	}
+
+	return state;
 }

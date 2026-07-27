@@ -2,8 +2,10 @@
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <cstdint>
+#include <Xinput.h>
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "xinput.lib")
 
 /// <summary>
 /// キーボードおよびマウス入力を一括管理するクラス
@@ -18,6 +20,12 @@ public:
 		long lY;
 		// ホイール回転量
 		long lZ;
+	};
+
+	// ジョイスティック(スティック)の入力を -1.0f ~ 1.0fで保持する構造体
+	struct JoystickState {
+		float x;
+		float y;
 	};
 
 private:
@@ -43,6 +51,11 @@ private:
 
 	// 1つ前のフレームにおけるマウスの入力状態
 	DIMOUSESTATE2 preMouseState = {};
+
+	// XInput(コントローラー)用データ
+	XINPUT_STATE gamepadState = {};
+	XINPUT_STATE preGamepadState = {};
+	bool isGamepadConnected = false;
 
 public:
 	/// <summary>
@@ -101,4 +114,15 @@ public:
 	/// マウスの移動量およびホイール回転量を取得する
 	/// </summary>
 	MouseMove GetMouseMove() const;
+
+	// コントローラー用メソッド
+	bool IsGamepadConnected() const { return isGamepadConnected; }
+
+	// ボタン入力の判定
+	bool IsPressButton(WORD button) const;
+	bool IsTriggerButton(WORD button) const;
+
+	// 左スティック・右スティックの倒し具合を取得(-1.0f ~ 1.0f, デッドゾーン処理込み)
+	JoystickState GetLeftStick() const;
+	JoystickState GetRightStick() const;
 };
