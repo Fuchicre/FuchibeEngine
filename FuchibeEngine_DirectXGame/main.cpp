@@ -722,30 +722,48 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				std::string vertexDefinition;
 				s >> vertexDefinition;
 
-				// 頂点の要素へのIndexは「位置/UV/法線」で格納されているため、分解してIndexを取得する
 				std::istringstream v(vertexDefinition);
-				uint32_t elementIndices[3];
+				std::string indexStr;
 
-				for (int32_t element = 0; element < 3; element++) {
-					std::string index;
+				// 各インデックスの初期値を 0(未設定)とする
+				uint32_t positionIndex = 0;
+				uint32_t texcoordIndex = 0;
+				uint32_t normalIndex = 0;
 
-					// 「/区切り」でIndexを読んでいく
-					std::getline(v, index, '/');
-					elementIndices[element] = std::stoi(index);
+				// 位置(Position)
+				if (std::getline(v, indexStr, '/') && !indexStr.empty()) {
+					positionIndex = std::stoi(indexStr);
 				}
 
-				// 要素のIndexから実際の要素の値を取得して、頂点を構築する
-				Vector4 position = positions[elementIndices[0] - 1];
-				Vector2 texcoord = texcoords[elementIndices[1] - 1];
-				Vector3 normal = normals[elementIndices[2] - 1];
+				// UV(Texcoord)
+				if (std::getline(v, indexStr, '/') && !indexStr.empty()) {
+					texcoordIndex = std::stoi(indexStr);
+				}
+
+				// 法線(Normal)
+				if (std::getline(v, indexStr, '/') && !indexStr.empty()) {
+					normalIndex = std::stoi(indexStr);
+				}
+
+				// インデックスをもとに要素を取得(未設定の場合はデフォルト値)
+				Vector4 position = (positionIndex > 0 && positionIndex <= positions.size())
+					? positions[positionIndex - 1] : Vector4{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+				// UVがない場合は {0, 0} にする
+				Vector2 texcoord = (texcoordIndex > 0 && texcoordIndex <= texcoords.size())
+					? texcoords[texcoordIndex - 1] : Vector2{ 0.0f, 0.0f };
+
+				Vector3 normal = (normalIndex > 0 && normalIndex <= normals.size())
+					? normals[normalIndex - 1] : Vector3{ 0.0f, 1.0f, 0.0f };
+
 				triangle[faceVertex] = { position, texcoord, normal };
 			}
-			// 頂点を逆順で登録することで、回り順を逆にする
+
+			// 頂点を逆順で登録(時計回り/反時計回りの合わせ)
 			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
 
-			// 現在アクティブなマテリアルグループの頂点数を加算(+3)
 			if (!modelData.materials.empty()) {
 				modelData.materials.back().vertexCount += 3;
 			}
@@ -1631,6 +1649,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 「multiMaterial.obj」モデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * multiMaterialModelData.vertices.size());
 
+	//================================
+	// 「suzanne.obj」の読み込み
+	//================================
+
+	ModelData suzanneModelData = LoadObjFile("resources", "suzanne.obj");
+
+	// 「suzanne.obj」モデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> suzanneModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * suzanneModelData.vertices.size());
+
 	//====================
 	// Sphere
 	//====================
@@ -1793,6 +1820,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	multiMaterialModelMaterialData->lightingMode = 0;
 	multiMaterialModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
+	//===========================================
+	// suzanneModelMaterialResourceの生成
+	//===========================================
+
+#pragma region suzanneModelMaterialResourceの生成
+
+	//==================================
+	// 「suzanne.obj」のマテリアル
+	//==================================
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> suzanneModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* suzanneModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	suzanneModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&suzanneModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	suzanneModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	suzanneModelMaterialData->lightingMode = 0;
+	suzanneModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -2017,6 +2074,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//=====================================
+	// suzanneModelWvpResourceの生成
+	//=====================================
+
+#pragma region suzanneModelWvpResourceの生成
+
+	// 「suzanne.obj」のWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> suzanneModelWvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
+
+	// データを書き込む
+	Matrix4x4* suzanneModelWvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	suzanneModelWvpResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&suzanneModelWvpData));
+
+	// HLSL側のwvpに単位行列を書き込む
+	*suzanneModelWvpData = MathUtils::MakeIdentity4x4();
+
+	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
+	*(suzanneModelWvpData + 1) = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
+
 	//====================================
 	// SphereMatrixResourceの生成
 	//====================================
@@ -2171,6 +2251,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//=================================================
+	// suzanneModel用の頂点バッファビューを作成する
+	//=================================================
+
+#pragma region suzanneModelVertexBufferView
+
+	// 「suzannel.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW suzanneModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	suzanneModelVertexBufferView.BufferLocation = suzanneModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	suzanneModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * suzanneModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	suzanneModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
 	//=====================================
 	// Sphere用の頂点バッファビューを作成する
 	//=====================================
@@ -2319,6 +2419,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 頂点データをリソースにコピー
 	std::memcpy(multiMaterialModelVertexData, multiMaterialModelData.vertices.data(), sizeof(VertexData) * multiMaterialModelData.vertices.size());
 	multiMaterialModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//===============================================
+	// suzanne.objの頂点リソースにデータを書き込む
+	//===============================================
+
+#pragma region suzanne.objの頂点リソースにデータを書き込む
+
+	VertexData* suzanneModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	suzanneModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&suzanneModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(suzanneModelVertexData, suzanneModelData.vertices.data(), sizeof(VertexData) * suzanneModelData.vertices.size());
+	suzanneModelVertexResource.Get()->Unmap(0, nullptr);
 
 #pragma endregion
 
@@ -2522,6 +2639,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// multiMaterial.obj用のTransformを作成する
 	Transform multiMaterialModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	// multiMaterial.obj用のTransformを作成する
+	Transform suzanneModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	// Sprite用のTransformを作成する
 	Transform spriteTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f} };
@@ -2961,11 +3081,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				ImGui::RadioButton("Stanford Bunny (bunny.obj)", &currentModelIndex, 3);
 				ImGui::RadioButton("MultiMesh (multiMesh.obj)", &currentModelIndex, 4);
 				ImGui::RadioButton("MultiMaterial (multiMaterial.obj)", &currentModelIndex, 5);
+				ImGui::RadioButton("Suzanne (suzanne.obj)", &currentModelIndex, 6);
 
 				// 選択中のモデルに応じてポインタを切り替え
 				Transform* currentTransform = &planeModelTransform;
 				Material* currentMaterialData = planeModelMaterialData;
 
+				// switch文での参照ポインタ切替
 				switch (currentModelIndex) {
 				case 0:
 					currentTransform = &planeModelTransform;
@@ -2990,6 +3112,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				case 5:
 					currentTransform = &multiMaterialModelTransform;
 					currentMaterialData = multiMaterialModelMaterialData;
+					break;
+				case 6:
+					currentTransform = &suzanneModelTransform;
+					currentMaterialData = suzanneModelMaterialData;
 					break;
 				}
 
@@ -3200,6 +3326,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				activeTransform = &multiMaterialModelTransform;
 				activeWvpData = multiMaterialModelWvpData;
 				break;
+			case 6:
+				activeTransform = &suzanneModelTransform;
+				activeWvpData = suzanneModelWvpData;
+				break;
 			}
 
 			Matrix4x4 activeWorldMatrix = MathUtils::MakeAffineMatrix(activeTransform->scale, activeTransform->rotate, activeTransform->translate);
@@ -3368,6 +3498,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
 					commandList->DrawInstanced(static_cast<UINT>(multiMaterialModelData.vertices.size()), 1, 0, 0);
 				}
+			} else if (currentModelIndex == 6) {
+				// Suzanne(suzanne.obj)の描画設定
+
+				// 定数バッファ(WVP行列 & マテリアル)のセット
+				commandList->SetGraphicsRootConstantBufferView(1, suzanneModelWvpResource.Get()->GetGPUVirtualAddress());
+				commandList->SetGraphicsRootConstantBufferView(0, suzanneModelMaterialResource.Get()->GetGPUVirtualAddress());
+
+				// 頂点バッファのセット
+				commandList->IASetVertexBuffers(0, 1, &suzanneModelVertexBufferView);
+
+				// テクスチャの設定(白テクスチャのSRVを指定してマテリアルカラーを素直に発色させる)
+				// 白画像用のSRV(textureSrvHandleGPU1)を設定
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
+
+				// 描画(DrawCall)
+				commandList->DrawInstanced(static_cast<UINT>(suzanneModelData.vertices.size()), 1, 0, 0);
 			}
 
 			//==========================================
