@@ -332,6 +332,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
 
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
+
 		Log(shaderError->GetStringPointer());
 
 		// 警告・エラーが出ている場合は止める
@@ -411,7 +412,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateTextureResource(
 	// Textureの次元数。普段使っているのは2次元
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION(metaData.dimension);
 
-	// 利用するHeapの設定。非常に特殊な運用。02_04_exで一般的なケース版がある
+	// 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 
 	// 細かい設定を行う
@@ -935,7 +936,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ソフトウェアアダプタでなければ採用する
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
 
-			// 採用したアダプタの情報をログに出力する(wstringの方なので注意する)
+			// 採用したアダプタの情報をログに出力する
 			Log(ConvertString(std::format(L"Use Adapter:{}\n", adapterDesc.Description)));
 
 			break;
@@ -2470,7 +2471,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	spriteVertexData[3].position = { w, 0.0f, 0.0f, 1.0f };
 	spriteVertexData[3].texcoord = { 1.0f, 0.0f };
 
-	// 全頂点に対して法線を設定(Sprite用)
+	// 全頂点に対して法線を設定
 	for (int i = 0; i < 4; i++) {
 		spriteVertexData[i].normal = { 0.0f, 0.0f, -1.0f };
 	}
@@ -3535,7 +3536,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				commandList->SetGraphicsRootConstantBufferView(1, sphereWvpResource.Get()->GetGPUVirtualAddress());
 				commandList->IASetVertexBuffers(0, 1, &sphereVertexBufferView);
 
-				// 球体用のIBVを設定
+				// Sphere用のIBVを設定
 				commandList->IASetIndexBuffer(&sphereIndexBufferView);
 
 				// uvChecker.png(GPU3)のテクスチャを設定
@@ -3706,7 +3707,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========
 	// 解放処理
 	//===========
+
 #pragma region 解放処理
+
+// GPUが実行中のコマンドをすべて完了するまで待つ
+	fenceValue++;
+	commandQueue->Signal(fence.Get(), fenceValue);
+	if (fence->GetCompletedValue() < fenceValue) {
+		fence->SetEventOnCompletion(fenceValue, fenceEvent);
+		WaitForSingleObject(fenceEvent, INFINITE);
+	}
 
 	// ImGuiの終了処理
 #ifdef USE_IMGUI
@@ -3715,30 +3725,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ImGui::DestroyContext();
 #endif
 
-	//===========================
-	// 入力管理クラスの解放処理
-	//===========================
-
+	// 入力管理クラスの解放
 	if (input) {
 		input->Finalize();
 		delete input;
 		input = nullptr;
 	}
 
-	// pSourceVoiceの解放
+	// 音声の解放
 	if (pSourceVoice) {
+		pSourceVoice->Stop(0);
 		pSourceVoice->DestroyVoice();
 		pSourceVoice = nullptr;
 	}
-
-	// 音声データの解放
 	audioManager->SoundUnload(&soundData1);
-
-	// XAudio2の解放処理
 	audioManager->Finalize();
 
-	// ウィンドウを閉じる
-	CloseWindow(hwnd);
+	// イベントハンドルの破棄
+	if (fenceEvent) {
+		CloseHandle(fenceEvent);
+	}
+
+	// ウィンドウ登録の解除
+	UnregisterClass(wc.lpszClassName, wc.hInstance);
 
 #pragma endregion
 

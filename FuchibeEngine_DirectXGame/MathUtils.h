@@ -27,7 +27,7 @@ struct Camera {
 	Vector3 pos;
 };
 
-class MathUtils{
+class MathUtils {
 
 public:
 
@@ -47,11 +47,7 @@ public:
 	static Matrix4x4 MakeTranslateMatrix(const Vector3& translate);
 
 	// Matrix4x4の乗算行列の作成関数
-	/*static Matrix4x4 MultiplyMatrix4x4(Matrix4x4 matrix1, Matrix4x4 matrix2);*/
 	static Matrix4x4 Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2);
-
-	// Vector同士の乗算行列の作成関数
-	/*static Vector3 MultiplyVector(Vector3 vector1, Vector3 vector2, Vector3 vector3);*/
 
 	// アフィン変換行列の作成関数
 	static Matrix4x4 MakeAffineMatrix(Vector3 scale, Vector3 rotateXYZ, Vector3 translate);
@@ -82,6 +78,6 @@ public:
 
 public:
 
-	static Camera camera;
+	static Camera mCamera;
 
 };

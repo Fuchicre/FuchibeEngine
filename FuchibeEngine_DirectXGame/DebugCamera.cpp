@@ -118,22 +118,34 @@ void DebugCamera::ProcessTranslation(Input* input) {
 	Vector3 move = { 0.0f, 0.0f, 0.0f };
 
 	// 前進
-	if (input->IsPress(DIK_W)) { move.z += mMoveSpeed; }
+	if (input->IsPress(DIK_W)) {
+		move.z += mMoveSpeed;
+	}
 
 	// 後退
-	if (input->IsPress(DIK_S)) { move.z -= mMoveSpeed; }
+	if (input->IsPress(DIK_S)) {
+		move.z -= mMoveSpeed;
+	}
 
 	// 右移動
-	if (input->IsPress(DIK_D)) { move.x += mMoveSpeed; }
+	if (input->IsPress(DIK_D)) {
+		move.x += mMoveSpeed;
+	}
 
 	// 左移動
-	if (input->IsPress(DIK_A)) { move.x -= mMoveSpeed; }
+	if (input->IsPress(DIK_A)) {
+		move.x -= mMoveSpeed;
+	}
 
 	// 上移動
-	if (input->IsPress(DIK_E)) { move.y += mMoveSpeed; }
+	if (input->IsPress(DIK_E)) {
+		move.y += mMoveSpeed;
+	}
 
 	// 下移動
-	if (input->IsPress(DIK_Q)) { move.y -= mMoveSpeed; }
+	if (input->IsPress(DIK_Q)) {
+		move.y -= mMoveSpeed;
+	}
 
 	// 移動ベクトルがある場合、カメラの現在の回転行列を使って変換する
 	if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {
