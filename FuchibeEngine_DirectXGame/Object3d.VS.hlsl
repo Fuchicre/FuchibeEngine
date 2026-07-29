@@ -5,7 +5,7 @@ struct TransformationMatrix{
     float32_t4x4 world;
 };
 
-ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b1);
+ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
 
 struct VertexShaderInput{
     float32_t4 position : POSITION0;

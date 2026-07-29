@@ -1368,8 +1368,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// VertexShaderで使う
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-	// レジスタ番号1を使う
-	rootParameters[1].Descriptor.ShaderRegister = 1;
+	// レジスタ番号0を使う
+	rootParameters[1].Descriptor.ShaderRegister = 0;
 
 	// DescriptorTableを使う
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -1401,6 +1401,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//================
 	// Samplerの設定
 	//================
+
+#pragma region Samplerの設定
 
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 
@@ -1443,6 +1445,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 	assert(SUCCEEDED(hr));
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1573,7 +1577,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 利用するト゚ポロジ(形状)のタイプを三角形にする
 	graphicsPilelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-	// どのように画面に色を打ち込むを設定する。今回は何も特殊なことをしないので、デフォルトのままにする
+	// どのように画面に色を打ち込むを設定する
 	graphicsPilelineStateDesc.SampleDesc.Count = 1;
 	graphicsPilelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
@@ -1588,6 +1592,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// オーディオシステムの初期化と読み込み
 	//===================================
 
+#pragma region オーディオシステムの初期化と読み込み
+
 	Audio* audioManager = Audio::GetInstance();
 
 	// XAudio2の初期化
@@ -1597,7 +1603,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 音声データの読み込み
 	//======================
 
-	Audio::SoundData soundData1 = audioManager->SoundLoadWave("resources/Alarm01.wav");
+	Audio::SoundData alarmSoundData = audioManager->SoundLoadWave("resources/Alarm01.wav");
+
+#pragma endregion
 
 	//=======================
 	// VertexResourceの生成
@@ -1606,62 +1614,88 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region VertexResourceの生成
 
 //====================================
-// 「plane.obj」モデルの読み込み
+// plane.objモデルの読み込み
 //====================================
+
+#pragma region plane.objモデルの読み込み
 
 	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
 
-	// 「plane.obj」モデルの頂点リソースの生成
+	// plane.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
 
-	//=========================
-	// 「teapot.obj」の読み込み
-	//=========================
+#pragma endregion
+
+	//===========================
+	// teapot.objモデルの読み込み
+	//===========================
+
+#pragma region teapot.objモデルの読み込み
 
 	ModelData teapotModelData = LoadObjFile("resources", "teapot.obj");
 
-	// 「teapot.obj」モデルの頂点リソースの生成
+	// teapot.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * teapotModelData.vertices.size());
 
-	//=========================
-	// 「bunny.obj」の読み込み
-	//=========================
+#pragma endregion
+
+	//==========================
+	// bunny.objモデルの読み込み
+	//==========================
+
+#pragma region bunny.objモデルの読み込み
 
 	ModelData bunnyModelData = LoadObjFile("resources", "bunny.obj");
 
-	// 「bunny.obj」モデルの頂点リソースの生成
+	// bunny.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * bunnyModelData.vertices.size());
 
+#pragma endregion
+
 	//=============================
-	// 「MultiMesh.obj」の読み込み
+	// MultiMesh.objモデルの読み込み
 	//=============================
+
+#pragma region MultiMesh.objモデルの読み込み
 
 	ModelData multiMeshModelData = LoadObjFile("resources", "multiMesh.obj");
 
-	// 「multiMesh.obj」モデルの頂点リソースの生成
+	// multiMesh.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * multiMeshModelData.vertices.size());
 
-	//================================
-	// 「MultiMaterial.obj」の読み込み
-	//================================
+#pragma endregion
+
+	//==================================
+	// MultiMaterial.objモデルの読み込み
+	//==================================
+
+#pragma region MultiMaterial.objモデルの読み込み
 
 	ModelData multiMaterialModelData = LoadObjFile("resources", "multiMaterial.obj");
 
-	// 「multiMaterial.obj」モデルの頂点リソースの生成
+	// multiMaterial.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * multiMaterialModelData.vertices.size());
 
+#pragma endregion
+
 	//================================
-	// 「suzanne.obj」の読み込み
+	// suzanne.objモデルの読み込み
 	//================================
+
+#pragma region suzanne.objモデルの読み込み
 
 	ModelData suzanneModelData = LoadObjFile("resources", "suzanne.obj");
 
-	// 「suzanne.obj」モデルの頂点リソースの生成
+	// suzanne.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> suzanneModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * suzanneModelData.vertices.size());
 
-	//====================
-	// Sphere
-	//====================
+#pragma endregion
+
+	//==========================
+	// Sphereの頂点リソースの生成
+	//==========================
+
+#pragma region Sphereの頂点リソースの生成
 
 	// 球体の分割数に合わせたサイズ
 	const uint32_t kSubdivision = 16;
@@ -1673,12 +1707,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 球の頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> sphereVertexResource = CreateBufferResource(device.Get(), sizeInBytes);
 
-	//=======================
-	// Sprite
-	//=======================
+#pragma endregion
+
+	//==========================
+	// Spriteの頂点リソースの生成
+	//==========================
+
+#pragma region Spriteの頂点リソースの生成
 
 	// Sprite用の頂点リソースを作成する
 	Microsoft::WRL::ComPtr<ID3D12Resource> spriteVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1865,8 +1905,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	sphereMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&sphereMaterialData));
 
 	sphereMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	// 初期値: None
 	sphereMaterialData->lightingMode = 0;
 	sphereMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
@@ -2641,7 +2679,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// multiMaterial.obj用のTransformを作成する
 	Transform multiMaterialModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	// multiMaterial.obj用のTransformを作成する
+	// suzanne.obj用のTransformを作成する
 	Transform suzanneModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	// Sprite用のTransformを作成する
@@ -2690,8 +2728,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Textureを読み込んで転送する
 
 	//==========================================
-	// 「plane.obj」のモデルのテクスチャを読み込む
+	// plane.objモデルのテクスチャを読み込む
 	//==========================================
+
+#pragma region plane.objモデルのテクスチャを読み込む
 
 	DirectX::ScratchImage planeModelMipImages = LoadTexture(planeModelData.material.textureFilePath);
 	const DirectX::TexMetadata& planeModelMetadata = planeModelMipImages.GetMetadata();
@@ -2699,9 +2739,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = CreateTextureResource(device.Get(), planeModelMetadata);
 
-	//==========================================
-	// 「teapot.obj」のモデルのテクスチャを読み込む
-	//==========================================
+#pragma endregion
+
+	//======================================
+	// teapot.objモデルのテクスチャを読み込む
+	//======================================
+
+#pragma region teapot.objモデルのテクスチャを読み込む
 
 	DirectX::ScratchImage teapotModelMipImages = LoadTexture(teapotModelData.material.textureFilePath);
 	const DirectX::TexMetadata& teapotModelMetadata = teapotModelMipImages.GetMetadata();
@@ -2709,9 +2753,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> teapotModelTextureResource = CreateTextureResource(device.Get(), teapotModelMetadata);
 
+#pragma endregion
+
 	//==========================================
-	// 「bunny.obj」のモデルのテクスチャを読み込む
+	// bunny.objモデルのテクスチャを読み込む
 	//==========================================
+
+#pragma region bunny.objモデルのテクスチャを読み込む
 
 	DirectX::ScratchImage bunnyModelMipImages = LoadTexture(bunnyModelData.material.textureFilePath);
 	const DirectX::TexMetadata& bunnyModelMetadata = bunnyModelMipImages.GetMetadata();
@@ -2719,9 +2767,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> bunnyModelTextureResource = CreateTextureResource(device.Get(), bunnyModelMetadata);
 
+#pragma endregion
+
 	//=============================================
-	// 「multiMesh.obj」のモデルのテクスチャを読み込む
+	// multiMesh.objモデルのテクスチャを読み込む
 	//=============================================
+
+#pragma region multiMesh.objモデルのテクスチャを読み込む
 
 	DirectX::ScratchImage multiMeshModelMipImages = LoadTexture(multiMeshModelData.material.textureFilePath);
 	const DirectX::TexMetadata& multiMeshModelMetadata = multiMeshModelMipImages.GetMetadata();
@@ -2729,9 +2781,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> multiMeshModelTextureResource = CreateTextureResource(device.Get(), multiMeshModelMetadata);
 
+#pragma endregion
+
 	//=================================================
-	// 「multiMaterial.obj」のモデルのテクスチャを読み込む
+	// multiMaterial.objモデルのテクスチャを読み込む
 	//=================================================
+
+#pragma region multiMaterial.objモデルのテクスチャを読み込む
 
 	DirectX::ScratchImage multiMaterialModelMipImages = LoadTexture(multiMaterialModelData.material.textureFilePath);
 	const DirectX::TexMetadata& multiMaterialModelMetadata = multiMaterialModelMipImages.GetMetadata();
@@ -2739,9 +2795,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> multiMaterialModelTextureResource = CreateTextureResource(device.Get(), multiMaterialModelMetadata);
 
+#pragma endregion
+
 	//==========================================
-	// monsterBallのテクスチャを読み込む
+	// monsterBall.pngのテクスチャを読み込む
 	//==========================================
+
+#pragma region monsterBall.pngのテクスチャを読み込む
 
 	DirectX::ScratchImage monsterBallMipImages = LoadTexture("resources/monsterBall.png");
 	const DirectX::TexMetadata& monsterBallMetadata = monsterBallMipImages.GetMetadata();
@@ -2749,9 +2809,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> monsterBallTextureResource = CreateTextureResource(device.Get(), monsterBallMetadata);
 
+#pragma endregion
+
 	//=============================
 	// Sphereのテクスチャを読み込む
 	//=============================
+
+#pragma region Sphereのテクスチャを読み込む
 
 	DirectX::ScratchImage sphereMipImages = LoadTexture("resources/uvChecker.png");
 	const DirectX::TexMetadata& sphereMetadata = sphereMipImages.GetMetadata();
@@ -2759,15 +2823,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> sphereTextureResource = CreateTextureResource(device.Get(), sphereMetadata);
 
+#pragma endregion
+
 	//==========================================
 	// Spriteのテクスチャを読み込む
 	//==========================================
+
+#pragma region Spriteのテクスチャを読み込む
 
 	DirectX::ScratchImage spriteMipImages = LoadTexture("resources/uvChecker.png");
 	const DirectX::TexMetadata& spriteMetadata = spriteMipImages.GetMetadata();
 
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> spriteTextureResource = CreateTextureResource(device.Get(), spriteMetadata);
+
+#pragma endregion
 
 #pragma endregion
 
@@ -2808,8 +2878,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma endregion
 
 	//===========================================
-	// 「plane.obj」のテクスチャのSRVを作成
+	// plane.objモデルのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region plane.objモデルのテクスチャのSRVを作成
 
 	// metaDataを基にSRVを作成
 	D3D12_SHADER_RESOURCE_VIEW_DESC planeModelSrvDesc{};
@@ -2833,9 +2905,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス1の場所に書き込まれる)
 	device->CreateShaderResourceView(planeModelTextureResource.Get(), &planeModelSrvDesc, textureSrvHandleCPU1);
 
+#pragma endregion
+
 	//===========================================
 	// SpriteのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region SpriteのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC spriteSrvDesc{};
 	spriteSrvDesc.Format = spriteMetadata.format;
@@ -2855,9 +2931,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成
 	device->CreateShaderResourceView(spriteTextureResource.Get(), &spriteSrvDesc, textureSrvHandleCPU2);
 
+#pragma endregion
+
 	//===========================================
 	// SphereのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region SphereのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC sphereSrvDesc{};
 	sphereSrvDesc.Format = sphereMetadata.format;
@@ -2877,9 +2957,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス3の場所に書き込まれる)
 	device->CreateShaderResourceView(sphereTextureResource.Get(), &sphereSrvDesc, textureSrvHandleCPU3);
 
+#pragma endregion
+
 	//===========================================
-	// teapotのテクスチャのSRVを作成
+	// teapot.objモデルのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region teapot.objモデルのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC teapotSrvDesc{};
 	teapotSrvDesc.Format = teapotModelMetadata.format;
@@ -2899,9 +2983,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス4の場所に書き込まれる)
 	device->CreateShaderResourceView(teapotModelTextureResource.Get(), &teapotSrvDesc, textureSrvHandleCPU4);
 
+#pragma endregion
+
 	//===========================================
-	// bunnyのテクスチャのSRVを作成
+	// bunny.objモデルのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region bunny.objモデルのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC bunnySrvDesc{};
 	bunnySrvDesc.Format = bunnyModelMetadata.format;
@@ -2921,9 +3009,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス5の場所に書き込まれる)
 	device->CreateShaderResourceView(bunnyModelTextureResource.Get(), &bunnySrvDesc, textureSrvHandleCPU5);
 
+#pragma endregion
+
 	//===========================================
-	// multiMeshのテクスチャのSRVを作成
+	// multiMesh.objモデルのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region multiMesh.objモデルのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC multiMeshSrvDesc{};
 	multiMeshSrvDesc.Format = multiMeshModelMetadata.format;
@@ -2943,9 +3035,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス6の場所に書き込まれる)
 	device->CreateShaderResourceView(multiMeshModelTextureResource.Get(), &multiMeshSrvDesc, textureSrvHandleCPU6);
 
-	//===========================================
-	// multiMaterialのテクスチャのSRVを作成
-	//===========================================
+#pragma endregion
+
+	//==============================================
+	// multiMaterial.objモデルのテクスチャのSRVを作成
+	//==============================================
+
+#pragma region multiMaterial.objモデルのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC multiMaterialSrvDesc{};
 	multiMaterialSrvDesc.Format = multiMaterialModelMetadata.format;
@@ -2965,9 +3061,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス7の場所に書き込まれる)
 	device->CreateShaderResourceView(multiMaterialModelTextureResource.Get(), &multiMaterialSrvDesc, textureSrvHandleCPU7);
 
+#pragma endregion
+
 	//===========================================
-	// monsterBallのテクスチャのSRVを作成
+	// monsterBall.pngのテクスチャのSRVを作成
 	//===========================================
+
+#pragma region monsterBall.pngのテクスチャのSRVを作成
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC monsterBallSrvDesc{};
 	monsterBallSrvDesc.Format = monsterBallMetadata.format;
@@ -2987,13 +3087,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// SRVを作成(インデックス8の場所に書き込まれる)
 	device->CreateShaderResourceView(monsterBallTextureResource.Get(), &monsterBallSrvDesc, textureSrvHandleCPU8);
 
+#pragma endregion
+
 	//================
 	// サウンドの再生
 	//================
 
 #pragma region サウンドの再生
 
-	audioManager->SoundPlayWave(soundData1);
+	audioManager->SoundPlayWave(alarmSoundData);
 
 #pragma endregion
 
@@ -3012,7 +3114,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ImGuiの切り替え用の変数
 	//=======================
 
-	// 0: plane.obj
 	int currentModelIndex = 0;
 	bool isSpriteVisible = true;
 
@@ -3051,33 +3152,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 			ImGui::Begin("Settings");
 
-			//===========================================
-			// Camera セクション
-			//===========================================
+			//==================================================
+			// 3DModel Transform & Selection Controls(操作説明)
+			//==================================================
 
-			if (ImGui::CollapsingHeader("Camera")) {
+			if (ImGui::CollapsingHeader("3DModel Transform & Selection Controls")) {
 
-				// デバッグカメラへの切り替え
-				ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+				if (ImGui::TreeNode("1. 3DModel Selection")) {
+					ImGui::BulletText("Keyboard : [1] - [7] Keys");
+					ImGui::BulletText("Gamepad  : [LB] Previous / [RB] Next");
+					ImGui::TreePop();
+				}
 
-				// デバッグカメラのリセット
-				if (useDebugCamera) {
-					if (ImGui::Button("Reset Debug Camera")) {
-						debugCamera->Reset();
-					}
+				if (ImGui::TreeNode("2. Translate (Position)")) {
+					ImGui::BulletText("Left / Right   : [A] / [D] | Left Stick X");
+					ImGui::BulletText("Up / Down      : [E], [Space] / [Q], [L-Shift] | Left Stick Y");
+					ImGui::BulletText("Forward / Back : [W] / [S] | [RB] / [LB]");
+					ImGui::TreePop();
+				}
+
+				if (ImGui::TreeNode("3. Rotate")) {
+					ImGui::BulletText("Yaw (Y-Axis)   : Mouse Left Drag (X) / [Left], [Right] | Right Stick X");
+					ImGui::BulletText("Pitch (X-Axis) : Mouse Left Drag (Y) / [Up], [Down]    | Right Stick Y");
+					ImGui::BulletText("Roll (Z-Axis)  : Mouse Right Drag (X)             | D-Pad Left / Right");
+					ImGui::TreePop();
+				}
+
+				if (ImGui::TreeNode("4. Scale")) {
+					ImGui::BulletText("Scale Up / Down : Mouse Wheel / D-Pad Up / Down");
+					ImGui::TreePop();
 				}
 			}
 
 			//===========================================
-			// Model セクション(Lighting項目を内包)
+			// 3DModel セクション(Lighting項目を内包)
 			//===========================================
 
-			if (ImGui::CollapsingHeader("Model Object", ImGuiTreeNodeFlags_DefaultOpen)) {
+			if (ImGui::CollapsingHeader("3DModel Object", ImGuiTreeNodeFlags_DefaultOpen)) {
 
 				// モデル選択
-				ImGui::Text("-Select Model-");
+				ImGui::Text("-Select 3DModel-");
 				ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
-				ImGui::RadioButton("Sphere (sphere.obj)", &currentModelIndex, 1);
+				ImGui::RadioButton("Sphere (sphere)", &currentModelIndex, 1);
 				ImGui::RadioButton("Utah Teapot (teapot.obj)", &currentModelIndex, 2);
 				ImGui::RadioButton("Stanford Bunny (bunny.obj)", &currentModelIndex, 3);
 				ImGui::RadioButton("MultiMesh (multiMesh.obj)", &currentModelIndex, 4);
@@ -3176,7 +3292,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				ImGui::RadioButton("Lambertian Reflectance", &currentMaterialData->lightingMode, 1);
 				ImGui::RadioButton("Half-Lambert", &currentMaterialData->lightingMode, 2);
 
-				// ライティングが有効(1: Lambertian または 2: Half-Lambert)の時だけライトパラメータを表示
+				// ライティングが有効(1: Lambertian または 2: Half-Lambert)の時だけライトパラメータを表示する
 				if (currentMaterialData->lightingMode != 0) {
 
 					ImGui::Separator();
@@ -3196,6 +3312,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						directionalLightData->color.z = 1.0f;
 						directionalLightData->intensity = 1.0f;
 						directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
+					}
+				}
+			}
+
+			//===========================================
+			// Camera セクション
+			//===========================================
+
+			if (ImGui::CollapsingHeader("Camera")) {
+
+				// デバッグカメラへの切り替え
+				ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+
+				// デバッグカメラのリセット
+				if (useDebugCamera) {
+					if (ImGui::Button("Reset Debug Camera")) {
+						debugCamera->Reset();
 					}
 				}
 			}
@@ -3254,12 +3387,48 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// フレームの先頭で入力を更新
 			//===================================
 
-			// 入力の更新
 			input->Update();
 
-			// 現在選択されているモデルの Transform ポインタを取得
-			Transform* activeTransform = &planeModelTransform;
+			//=============================================================================
+			// モデル選択の切り替え(currentModelIndex: 0 ~ 6)
+			//=============================================================================
 
+			const int kMaxModels = 7;
+
+			//============================================
+			// キーボードの数字キー(1 ~ 7)で描画内容を直接選択
+			//============================================
+
+			if (input->IsTrigger(DIK_1)) { currentModelIndex = 0; }
+			if (input->IsTrigger(DIK_2)) { currentModelIndex = 1; }
+			if (input->IsTrigger(DIK_3)) { currentModelIndex = 2; }
+			if (input->IsTrigger(DIK_4)) { currentModelIndex = 3; }
+			if (input->IsTrigger(DIK_5)) { currentModelIndex = 4; }
+			if (input->IsTrigger(DIK_6)) { currentModelIndex = 5; }
+			if (input->IsTrigger(DIK_7)) { currentModelIndex = 6; }
+
+			//================================================
+			// コントローラーの LB / RB ボタンで描画内容を切り替え
+			//================================================
+
+			if (input->IsGamepadConnected()) {
+
+				// RB ボタンを押した瞬間: 次のモデルへ(最後を超えたら 0 に戻る)
+				if (input->IsTriggerButton(XINPUT_GAMEPAD_RIGHT_SHOULDER)) {
+					currentModelIndex = (currentModelIndex + 1) % kMaxModels;
+				}
+
+				// LB ボタンを押した瞬間: 前のモデルへ(0 未満になったら 6 に巡回)
+				if (input->IsTriggerButton(XINPUT_GAMEPAD_LEFT_SHOULDER)) {
+					currentModelIndex = (currentModelIndex - 1 + kMaxModels) % kMaxModels;
+				}
+			}
+
+			//================================================
+			// 現在選択されているモデルの Transform ポインタを取得
+			//================================================
+
+			Transform* activeTransform = &planeModelTransform;
 			switch (currentModelIndex) {
 			case 0:
 				activeTransform = &planeModelTransform;
@@ -3284,79 +3453,119 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				break;
 			}
 
-			// Xboxコントローラーによる Transform 操作
+			//=============================================================================
+			// Transform 操作(コントローラー & キーボード / マウス対応)
+			//=============================================================================
+
+			// 各種感度の設定 //
+
+			// 移動速度
+			const float moveSpeed = 0.05f;
+
+			// 回転速度
+			const float rotateSpeed = 0.03f;
+
+			// 拡縮速度
+			const float scaleSpeed = 0.01f;
+
+			// マウス移動量(ドラッグ)に対する回転感度の係数
+			const float mouseRotateSpeed = 0.005f;
+
+			// マウスホイールの回転量に対する拡大・縮小感度の係数
+			const float mouseScaleSpeed = 0.001f;
+
+			//===========================================
+			// Xboxコントローラー(XInput)による操作
+			//===========================================
+
 			if (input->IsGamepadConnected()) {
-
-				// 各種感度の設定 //
-
-				// 移動速度
-				const float moveSpeed = 0.05f;
-
-				// 回転速度
-				const float rotateSpeed = 0.03f;
-
-				// 拡大縮小速度
-				const float scaleSpeed = 0.01f;
 
 				Input::JoystickState leftStick = input->GetLeftStick();
 				Input::JoystickState rightStick = input->GetRightStick();
 
-				//===========================================
-				// 【Translate】(位置移動)
-				//===========================================
-
-				// 左スティック X/Y : X軸(左右)・Y軸(上下)移動
+				//--- 【Translate】(位置移動)---//
+				// 左スティック X/Y: X軸(左右)・Y軸(上下)移動
 				activeTransform->translate.x += leftStick.x * moveSpeed;
 				activeTransform->translate.y += leftStick.y * moveSpeed;
 
 				// RB / LB ボタン : Z軸(前後)移動
-
-				// RB
 				if (input->IsPressButton(XINPUT_GAMEPAD_RIGHT_SHOULDER)) {
 					activeTransform->translate.z += moveSpeed;
 				}
-
-				// LB
 				if (input->IsPressButton(XINPUT_GAMEPAD_LEFT_SHOULDER)) {
 					activeTransform->translate.z -= moveSpeed;
 				}
 
-				//===========================================
-				// 【Rotate】(回転)
-				//===========================================
-
-				// 右スティック X/Y : Y軸(左右回転)・X軸(上下ピッチ回転)
-				activeTransform->rotate.y += rightStick.x * rotateSpeed;
-
-				// 上下に傾ける操作感に合わせ反転
+				//--- 【Rotate】(回転)---//
+				// 右スティック X/Y: Y軸(左右回転)・X軸(上下ピッチ回転)
+				activeTransform->rotate.y -= rightStick.x * rotateSpeed;
 				activeTransform->rotate.x -= rightStick.y * rotateSpeed;
 
-				// D-Pad(十字キー)左右 : Z軸(ロール回転)
+				// 十字キー左右: Z軸(ロール回転)
 				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_RIGHT)) {
 					activeTransform->rotate.z -= rotateSpeed;
 				}
-
 				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_LEFT)) {
 					activeTransform->rotate.z += rotateSpeed;
 				}
 
-				//===========================================
-				// 【Scale】(拡大・縮小)
-				//===========================================
-
-				// D-Pad(十字キー)上/下 : 全軸均等スケール変更
+				//--- 【Scale】(拡大・縮小)---//
+				// 十字キー上/下: 全軸均等スケール変更
 				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_UP)) {
 					activeTransform->scale.x += scaleSpeed;
 					activeTransform->scale.y += scaleSpeed;
 					activeTransform->scale.z += scaleSpeed;
 				}
-
 				if (input->IsPressButton(XINPUT_GAMEPAD_DPAD_DOWN)) {
-					// スケールが 0 以下にならないよう制限
 					activeTransform->scale.x = (std::max)(0.01f, activeTransform->scale.x - scaleSpeed);
 					activeTransform->scale.y = (std::max)(0.01f, activeTransform->scale.y - scaleSpeed);
 					activeTransform->scale.z = (std::max)(0.01f, activeTransform->scale.z - scaleSpeed);
 				}
+			}
+
+			//===========================================
+			// キーボード & マウス による操作
+			//===========================================
+
+			//--- 【Translate】(キーボードによる移動: WASD / QE / 矢印キー)---//
+			// A / D: X軸(左右)移動
+			if (input->IsPress(DIK_A)) { activeTransform->translate.x -= moveSpeed; }
+			if (input->IsPress(DIK_D)) { activeTransform->translate.x += moveSpeed; }
+
+			// W / S: Z軸(前後)移動
+			if (input->IsPress(DIK_W)) { activeTransform->translate.z += moveSpeed; }
+			if (input->IsPress(DIK_S)) { activeTransform->translate.z -= moveSpeed; }
+
+			// E / Q または Space / Shift : Y軸(上下)移動
+			if (input->IsPress(DIK_E) || input->IsPress(DIK_SPACE)) { activeTransform->translate.y += moveSpeed; }
+			if (input->IsPress(DIK_Q) || input->IsPress(DIK_LSHIFT)) { activeTransform->translate.y -= moveSpeed; }
+
+			// キーボード矢印キーによるロール・上下回転操作
+			if (input->IsPress(DIK_LEFT)) { activeTransform->rotate.y += rotateSpeed; }
+			if (input->IsPress(DIK_RIGHT)) { activeTransform->rotate.y -= rotateSpeed; }
+			if (input->IsPress(DIK_UP)) { activeTransform->rotate.x -= rotateSpeed; }
+			if (input->IsPress(DIK_DOWN)) { activeTransform->rotate.x += rotateSpeed; }
+
+			//--- 【Rotate & Scale】(マウスによるドラッグ回転・ホイール拡大縮小)---//
+			Input::MouseMove mouseMove = input->GetMouseMove();
+
+			// 左ドラッグ: X軸・Y軸の回転
+			if (input->IsPressMouse(0)) {
+				activeTransform->rotate.y += mouseMove.lX * mouseRotateSpeed;
+				activeTransform->rotate.x += mouseMove.lY * mouseRotateSpeed;
+			}
+
+			// 右ドラッグ: Z軸の回転
+			if (input->IsPressMouse(1)) {
+				activeTransform->rotate.z += mouseMove.lX * mouseRotateSpeed;
+			}
+
+			// ホイール回転: 拡大・縮小
+			if (mouseMove.lZ != 0) {
+				float scaleDelta = mouseMove.lZ * mouseScaleSpeed;
+				activeTransform->scale.x = (std::max)(0.01f, activeTransform->scale.x + scaleDelta);
+				activeTransform->scale.y = (std::max)(0.01f, activeTransform->scale.y + scaleDelta);
+				activeTransform->scale.z = (std::max)(0.01f, activeTransform->scale.z + scaleDelta);
 			}
 
 			// === デバッグカメラの更新(行列計算の前に呼び出す) === //
@@ -3513,8 +3722,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			//==========================================
-			// モデル(3D)の描画設定(モデル切り替えも対応)
+			// 3Dモデルの描画設定(モデル切り替えも対応)
 			//==========================================
+
+#pragma region 3Dモデルの描画設定(モデル切り替えも対応)
 
 			// 共通のライト設定
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
@@ -3614,9 +3825,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				commandList->DrawInstanced(static_cast<UINT>(suzanneModelData.vertices.size()), 1, 0, 0);
 			}
 
+#pragma endregion
+
 			//==========================================
 			// Sprite(2D)の描画設定
 			//==========================================
+
+#pragma region Sprite(2D)の描画設定
 
 			if (isSpriteVisible) {
 
@@ -3638,6 +3853,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// Spriteの描画コマンド!!(DrawCall) 6個のインデックスを使用し、1つのインスタンスを描画
 				commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 			}
+
+#pragma endregion
 
 			// 実際のcommandListのImGui描画コマンドを積む
 #ifdef USE_IMGUI
@@ -3738,7 +3955,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		pSourceVoice->DestroyVoice();
 		pSourceVoice = nullptr;
 	}
-	audioManager->SoundUnload(&soundData1);
+	audioManager->SoundUnload(&alarmSoundData);
 	audioManager->Finalize();
 
 	// イベントハンドルの破棄
