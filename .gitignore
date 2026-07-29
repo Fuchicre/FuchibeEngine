@@ -368,4 +368,4 @@ imgui.ini
 
 # resources以下にあるobjファイルをgitに登録
 *.obj
-!resources/**/*.obj
+!FuchibeEngine_DirectXGame/resources/**/*.obj
