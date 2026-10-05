@@ -1689,20 +1689,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 //====================================
 
 	// 「plane.obj」モデルの読み込み
-	ModelData modelData1 = LoadObjFile("resources", "plane.obj");
+	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
 
 	// 「plane.obj」モデルの頂点リソースの生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource1 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData1.vertices.size());
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
 
 	// Sprite用の頂点リソースを作成する
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeVertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
 
 	//================================
 	// 「axis.obj」のモデルとテクスチャ
 	//================================
 
-	ModelData modelData2 = LoadObjFile("resources", "axis.obj");
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource2 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData2.vertices.size());
+	ModelData axisModelData = LoadObjFile("resources", "axis.obj");
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * axisModelData.vertices.size());
+
+	//================================
+	// 「fence.obj」のモデルとテクスチャ
+	//================================
+
+	ModelData fenceModelData = LoadObjFile("resources", "fence.obj");
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * fenceModelData.vertices.size());
 
 #pragma endregion
 
@@ -1717,44 +1724,66 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//===========================
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource1 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
-	Material* materialData1 = nullptr;
+	Material* planeModelMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData1));
+	planeModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialData1->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	planeModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Lightingを有効にする
-	materialData1->enableLighting = true;
-	materialData1->uvTransform = MathUtils::MakeIdentity4x4();
+	planeModelMaterialData->enableLighting = true;
+	planeModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 	//===========================
 	// 「axis.obj」のマテリアル
 	//===========================
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource2 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
-	Material* materialData2 = nullptr;
+	Material* axisModelMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData2));
+	axisModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&axisModelMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialData2->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	axisModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Lightingを有効にする
-	materialData2->enableLighting = true;
-	materialData2->uvTransform = MathUtils::MakeIdentity4x4();
+	axisModelMaterialData->enableLighting = true;
+	axisModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+	//===========================
+	// 「fence.obj」のマテリアル
+	//===========================
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* fenceModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	fenceModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&fenceModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	fenceModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	fenceModelMaterialData->enableLighting = true;
+	fenceModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
@@ -1869,32 +1898,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//=======================
 
 	// 「plane.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView1{};
+	D3D12_VERTEX_BUFFER_VIEW planeModelVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
-	vertexBufferView1.BufferLocation = vertexResource1.Get()->GetGPUVirtualAddress();
+	planeModelVertexBufferView.BufferLocation = planeModelVertexResource.Get()->GetGPUVirtualAddress();
 
 	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView1.SizeInBytes = UINT(sizeof(VertexData) * modelData1.vertices.size());
+	planeModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * planeModelData.vertices.size());
 
 	// 1頂点あたりのサイズ
-	vertexBufferView1.StrideInBytes = sizeof(VertexData);
+	planeModelVertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	//=======================
 	// 「axis.obj」モデル
 	//=======================
 
 	// 「axis.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView2{};
+	D3D12_VERTEX_BUFFER_VIEW axisModelVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
-	vertexBufferView2.BufferLocation = vertexResource2.Get()->GetGPUVirtualAddress();
+	axisModelVertexBufferView.BufferLocation = axisModelVertexResource.Get()->GetGPUVirtualAddress();
 
 	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView2.SizeInBytes = UINT(sizeof(VertexData) * modelData2.vertices.size());
+	axisModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * axisModelData.vertices.size());
 
 	// 1頂点あたりのサイズ
-	vertexBufferView2.StrideInBytes = sizeof(VertexData);
+	axisModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	//======================
+	// 「fence.obj」モデル
+	//======================
+
+	// 「fence.obj」モデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW fenceModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	fenceModelVertexBufferView.BufferLocation = fenceModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	fenceModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * fenceModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	fenceModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
 #pragma endregion
 
 	//================================
@@ -1908,14 +1954,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//=======================
 
 	// 「plane.obj」モデルの頂点リソースにデータを書き込む
-	VertexData* vertexData1 = nullptr;
+	VertexData* planeModelVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	vertexResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData1));
+	planeModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelVertexData));
 
 	// 頂点データをリソースにコピー
-	std::memcpy(vertexData1, modelData1.vertices.data(), sizeof(VertexData) * modelData1.vertices.size());
-	vertexResource1.Get()->Unmap(0, nullptr);
+	std::memcpy(planeModelVertexData, planeModelData.vertices.data(), sizeof(VertexData) * planeModelData.vertices.size());
+	planeModelVertexResource.Get()->Unmap(0, nullptr);
 
 	//=======================
 	// 「axis.obj」のモデル
@@ -1925,11 +1971,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	VertexData* vertexData2 = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	vertexResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData2));
+	axisModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData2));
 
 	// 頂点データをリソースにコピー
-	std::memcpy(vertexData2, modelData2.vertices.data(), sizeof(VertexData) * modelData2.vertices.size());
-	vertexResource2.Get()->Unmap(0, nullptr);
+	std::memcpy(vertexData2, axisModelData.vertices.data(), sizeof(VertexData) * axisModelData.vertices.size());
+	axisModelVertexResource.Get()->Unmap(0, nullptr);
 
 #pragma endregion
 
@@ -2016,7 +2062,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 「plane.obj」のモデルのテクスチャを読み込む
 	//==========================================
 
-	DirectX::ScratchImage mipImages1 = LoadTexture(modelData1.material.textureFilePath);
+	DirectX::ScratchImage mipImages1 = LoadTexture(planeModelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata1 = mipImages1.GetMetadata();
 
 	// リソース作成
@@ -2026,7 +2072,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 「axis.obj」のモデルのテクスチャを読み込む
 	//===========================================
 
-	DirectX::ScratchImage mipImages2 = LoadTexture(modelData2.material.textureFilePath);
+	DirectX::ScratchImage mipImages2 = LoadTexture(axisModelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 
 	// リソース作成
@@ -2250,7 +2296,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::Separator();
 
 			// 色編集用のImGui
-			ImGui::ColorEdit4("Sphere Color", &materialData1->color.x);
+			ImGui::ColorEdit4("Sphere Color", &planeModelMaterialData->color.x);
 
 			ImGui::Separator();
 
@@ -2322,13 +2368,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
 
 			if (currentModelIndex == 0) {
-				materialData1->uvTransform = uvTransformMatrix;
+				planeModelMaterialData->uvTransform = uvTransformMatrix;
 			} else {
-				materialData2->uvTransform = uvTransformMatrix;
+				axisModelMaterialData->uvTransform = uvTransformMatrix;
 			}
 
 			// 描画用の頂点数を決定
-			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(modelData1.vertices.size()) : UINT(modelData2.vertices.size());
+			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(planeModelData.vertices.size()) : UINT(axisModelData.vertices.size());
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -2433,13 +2479,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			if (currentModelIndex == 0) {
 
 				// Plane の描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource1.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView1);
+				commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
 			} else {
 				// Axisの描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource2.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView2);
+				commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
 			}
 
