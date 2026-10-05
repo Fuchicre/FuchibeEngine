@@ -30,7 +30,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dbghelp.lib")
-#pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dxcompiler.lib")
 
 //========================
@@ -156,7 +155,7 @@ std::wstring ConvertString(const std::string& str) {
 		return std::wstring();
 	}
 
-	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
+	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), nullptr, 0);
 	if (sizeNeeded == 0) {
 		return std::wstring();
 	}
@@ -170,12 +169,12 @@ std::string ConvertString(const std::wstring& str) {
 		return std::string();
 	}
 
-	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
+	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), nullptr, 0, nullptr, nullptr);
 	if (sizeNeeded == 0) {
 		return std::string();
 	}
 	std::string result(sizeNeeded, 0);
-	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
+	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, nullptr, nullptr);
 	return result;
 }
 
@@ -1234,7 +1233,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(hr));
 
 	// Fenceのシグナルを待つためのEventを生成する
-	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	assert(fenceEvent != nullptr);
 
 #pragma endregion
@@ -2229,7 +2228,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			input->Update();
 
 			// 数字の0キーが押されていたら(トリガー処理)
-			if (input->IsTrigger(DIK_0)) {
+			if (input->IsTriggerKey(DIK_0)) {
 				// 出力ウィンドウに「hit 0」と表示
 				OutputDebugStringA("hit 0\n");
 			}

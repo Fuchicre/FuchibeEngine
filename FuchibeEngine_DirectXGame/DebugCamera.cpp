@@ -66,22 +66,22 @@ void DebugCamera::ProcessRotation(Input* input) {
 	float keyRotY = 0.0f;
 
 	// 上キーで上を向く
-	if (input->IsPress(DIK_UPARROW)) {
+	if (input->IsPressKey(DIK_UPARROW)) {
 		keyRotX += mRotSpeed;
 	}
 
 	// 下キーで下を向く
-	if (input->IsPress(DIK_DOWNARROW)) {
+	if (input->IsPressKey(DIK_DOWNARROW)) {
 		keyRotX -= mRotSpeed;
 	}
 
 	// 左キーで左を見る
-	if (input->IsPress(DIK_LEFTARROW)) {
+	if (input->IsPressKey(DIK_LEFTARROW)) {
 		keyRotY += mRotSpeed;
 	}
 
 	// 右キーで右を見る
-	if (input->IsPress(DIK_RIGHTARROW)) {
+	if (input->IsPressKey(DIK_RIGHTARROW)) {
 		keyRotY -= mRotSpeed;
 	}
 
@@ -118,22 +118,22 @@ void DebugCamera::ProcessTranslation(Input* input) {
 	Vector3 move = { 0.0f, 0.0f, 0.0f };
 
 	// 前進
-	if (input->IsPress(DIK_W)) { move.z += mMoveSpeed; }
+	if (input->IsPressKey(DIK_W)) { move.z += mMoveSpeed; }
 
 	// 後退
-	if (input->IsPress(DIK_S)) { move.z -= mMoveSpeed; }
+	if (input->IsPressKey(DIK_S)) { move.z -= mMoveSpeed; }
 
 	// 右移動
-	if (input->IsPress(DIK_D)) { move.x += mMoveSpeed; }
+	if (input->IsPressKey(DIK_D)) { move.x += mMoveSpeed; }
 
 	// 左移動
-	if (input->IsPress(DIK_A)) { move.x -= mMoveSpeed; }
+	if (input->IsPressKey(DIK_A)) { move.x -= mMoveSpeed; }
 
 	// 上移動
-	if (input->IsPress(DIK_E)) { move.y += mMoveSpeed; }
+	if (input->IsPressKey(DIK_E)) { move.y += mMoveSpeed; }
 
 	// 下移動
-	if (input->IsPress(DIK_Q)) { move.y -= mMoveSpeed; }
+	if (input->IsPressKey(DIK_Q)) { move.y -= mMoveSpeed; }
 
 	// 移動ベクトルがある場合、カメラの現在の回転行列を使って変換する
 	if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {

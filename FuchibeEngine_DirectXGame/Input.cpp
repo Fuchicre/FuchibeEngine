@@ -1,5 +1,7 @@
 #include "Input.h"
 #include <cassert>
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
 
 /// <summary>
 /// DirectInputおよびキーボードデバイスの初期化処理
@@ -14,6 +16,12 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 
 	// HRESULT型の変数
 	HRESULT hr;
+
+	//==============================
+	// DirectInputのインスタンス生成
+	//==============================
+
+#pragma region DirectInputのインスタンス生成
 
 	// DirectInputのAPIを呼び出して、全体の管理オブジェクト(システム)を作成
 	hr = DirectInput8Create(
@@ -32,7 +40,14 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	// 初期化が成功したかをチェック。失敗した場合はプログラムを停止させる
 	assert(SUCCEEDED(hr));
 
+#pragma endregion
+
+	//=========================
 	// キーボードデバイスの生成
+	//=========================
+
+#pragma region キーボードデバイスの生成
+
 	hr = directInput->CreateDevice(
 		// キーボードを指定するための定義済みの識別子
 		GUID_SysKeyboard,
@@ -43,13 +58,26 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	);
 	assert(SUCCEEDED(hr));
 
-	// 入力データ形式のセット //
+#pragma endregion
+
+	//================================
+	// 入力データ形式のセット(キーボード)
+	//================================
+
+#pragma region 入力データ形式のセット(キーボード)
 
 	// 標準形式
 	hr = keyboard->SetDataFormat(&c_dfDIKeyboard);
 	assert(SUCCEEDED(hr));
 
-	// 排他制御レベルのセット
+#pragma endregion
+
+	//================================
+	// 排他制御レベルのセット(キーボード)
+	//================================
+
+#pragma region 排他制御レベルのセット(キーボード)
+
 	hr = keyboard->SetCooperativeLevel(
 		// ウィンドウハンドル
 		hwnd,
@@ -58,7 +86,14 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	);
 	assert(SUCCEEDED(hr));
 
+#pragma endregion
+
+	//=====================
 	// マウスデバイスの生成
+	//=====================
+
+#pragma region マウスデバイスの生成
+
 	hr = directInput->CreateDevice(
 		GUID_SysMouse,
 		&mouse,
@@ -66,11 +101,25 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	);
 	assert(SUCCEEDED(hr));
 
+#pragma endregion
+
+	//==========================================
 	// 入力データ形式のセット(拡張マウスフォーマット)
+	//==========================================
+
+#pragma region 入力データ形式のセット(拡張マウスフォーマット)
+
 	hr = mouse->SetDataFormat(&c_dfDIMouse2);
 	assert(SUCCEEDED(hr));
 
-	// 排他制御レベルのセット
+#pragma endregion
+
+	//=============================
+	// 排他制御レベルのセット(マウス)
+	//=============================
+
+#pragma region 排他制御レベルのセット(マウス)
+
 	hr = mouse->SetCooperativeLevel(
 		hwnd,
 		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE
@@ -78,33 +127,10 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	assert(SUCCEEDED(hr));
 
 #pragma endregion
+
+#pragma endregion
+
 }
-
-/// <summary>
-/// 毎フレームの最初に入力状態を更新する処理
-/// </summary>
-//void Input::Update() {
-//
-//	// 新しい入力を得る前に、現在の入力状態を「1つ前のフレームの状態(preKey)」へ丸ごとコピーする
-//	// これにより、前フレームと現フレームの比較(トリガー判定)ができるようになる
-//	memcpy(preKey, key, sizeof(key));
-//
-//	// キーボード情報の取得開始
-//	keyboard->Acquire();
-//
-//	// 全キーの入力状態を取得する
-//	keyboard->GetDeviceState(sizeof(key), key);
-//
-//	// マウスの前フレーム状態を保存
-//	preMouseState = mouseState;
-//
-//	// マウス情報の取得開始
-//	mouse->Acquire();
-//
-//	// マウスの入力状態を取得する
-//	mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState);
-//}
-
 
 /// <summary>
 /// 毎フレームの最初に入力状態を更新する処理
@@ -167,8 +193,7 @@ void Input::Finalize() {
 	// マウスデバイスが作られていれば解放する
 	if (mouse) {
 		mouse->Unacquire();
-		mouse->Release();
-		mouse = nullptr;
+		mouse.Reset();
 	}
 
 	// キーボードデバイスが作られていれば解放する
@@ -176,15 +201,13 @@ void Input::Finalize() {
 		// キーボードの制御権を明示的に手放す
 		keyboard->Unacquire();
 		// COMオブジェクトの参照カウントを減らし、メモリを解放する
-		keyboard->Release();
-		keyboard = nullptr;
+		keyboard.Reset();
 	}
 
 	// DirectInputシステムが作られていれば解放する
 	if (directInput) {
 		// COMオブジェクトの参照カウントを減らし、メモリを解放する
-		directInput->Release();
-		directInput = nullptr;
+		directInput.Reset();
 	}
 }
 
@@ -196,7 +219,7 @@ void Input::Finalize() {
 /// <summary>
 /// キーを押した状態か
 /// </summary>
-bool Input::IsPress(uint8_t keyCode) const {
+bool Input::IsPressKey(uint8_t keyCode) const {
 	// 現在のフレームで、該当キーの最上位ビットが1(0x80とAND演算して0以外)なら押されている
 	return (key[keyCode] & 0x80) != 0;
 }
@@ -204,7 +227,7 @@ bool Input::IsPress(uint8_t keyCode) const {
 /// <summary>
 /// キーを離した状態か
 /// </summary>
-bool Input::IsRelease(uint8_t keyCode) const {
+bool Input::IsReleaseKey(uint8_t keyCode) const {
 	// 現在のフレームで、該当キーの最上位ビットが0(0x80とAND演算して0)なら離されている
 	return (key[keyCode] & 0x80) == 0;
 }
@@ -212,7 +235,7 @@ bool Input::IsRelease(uint8_t keyCode) const {
 /// <summary>
 /// キーを押した瞬間か(トリガー処理)
 /// </summary>
-bool Input::IsTrigger(uint8_t keyCode) const {
+bool Input::IsTriggerKey(uint8_t keyCode) const {
 	// 「前フレームで最上位ビットが0(押されていない)」かつ「現フレームで最上位ビットが1(押されている)」
 	// この2つの条件が同時に満たされたとき、まさに「今押された瞬間」と判定する
 	return ((preKey[keyCode] & 0x80) == 0) && ((key[keyCode] & 0x80) != 0);
@@ -221,7 +244,7 @@ bool Input::IsTrigger(uint8_t keyCode) const {
 /// <summary>
 /// キーを離した瞬間か
 /// </summary>
-bool Input::IsReleaseTrigger(uint8_t keyCode) const {
+bool Input::IsReleaseTriggerKey(uint8_t keyCode) const {
 	// 「前フレームで最上位ビットが1(押されていた)」かつ「現フレームで最上位ビットが0(離された)」
 	// この2つの条件が同時に満たされたとき、まさに「今キーが指から離れた瞬間」と判定する
 	return ((preKey[keyCode] & 0x80) != 0) && ((key[keyCode] & 0x80) == 0);
@@ -235,6 +258,16 @@ bool Input::IsPressMouse(int32_t buttonNumber) const {
 		return false;
 	}
 	return (mouseState.rgbButtons[buttonNumber] & 0x80) != 0;
+}
+
+/// <summary>
+/// マウスボタンが押された瞬間か
+/// </summary>
+bool Input::IsTriggerMouse(int32_t buttonNumber) const {
+	if (buttonNumber < 0 || buttonNumber >= 8) {
+		return false;
+	}
+	return ((preMouseState.rgbButtons[buttonNumber] & 0x80) == 0) && ((mouseState.rgbButtons[buttonNumber] & 0x80) != 0);
 }
 
 /// <summary>
