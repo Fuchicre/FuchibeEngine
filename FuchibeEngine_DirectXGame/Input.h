@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <Windows.h>
 #include <wrl.h>
+#include "WindowsApi.h"
 
 /// <summary>
 /// キーボードおよびマウス入力を一括管理するクラス
@@ -31,7 +32,7 @@ public:
 	/// </summary>
 	/// <param name="hInstance">アプリケーションのインスタンスハンドル</param>
 	/// <param name="hwnd">操作対象となるウィンドウのハンドル</param>
-	void Initialize(HINSTANCE hInstance, HWND hwnd);
+	void Initialize(WindowsApi* windowsApi);
 
 	/// <summary>
 	/// 毎フレームの最初に入力状態を更新する処理(元の取得処理を内包)
@@ -111,4 +112,7 @@ private:
 
 	// 1つ前のフレームにおけるマウスの入力状態
 	DIMOUSESTATE2 preMouseState = {};
+
+	// WindowsAPI
+	WindowsApi* windowsApi = nullptr;
 };

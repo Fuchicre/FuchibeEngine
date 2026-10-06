@@ -20,12 +20,11 @@
 #include <wrl.h>
 #include "Audio.h"
 #include "Input.h"
+#include "WindowsApi.h"
 #include "DebugCamera.h"
 #ifdef USE_IMGUI
-#include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -36,34 +35,34 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 // ウィンドウプロシージャ
 //========================
 
-#pragma region ウィンドウプロシージャ
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-
-#ifdef USE_IMGUI
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
-		return true;
-	}
-#endif
-
-	// メッセージに応じてゲーム固有の処理を行う
-	switch (msg) {
-
-		// ウィンドウが破棄された
-	case WM_DESTROY:
-
-		// OSに対して、アプリの終了を伝える
-		PostQuitMessage(0);
-
-		return 0;
-	}
-
-	// 標準のメッセージ処理を行う
-	return DefWindowProc(hwnd, msg, wparam, lparam);
-
-}
-
-#pragma endregion
+//#pragma region ウィンドウプロシージャ
+//
+//LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+//
+//#ifdef USE_IMGUI
+//	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
+//		return true;
+//	}
+//#endif
+//
+//	// メッセージに応じてゲーム固有の処理を行う
+//	switch (msg) {
+//
+//		// ウィンドウが破棄された
+//	case WM_DESTROY:
+//
+//		// OSに対して、アプリの終了を伝える
+//		PostQuitMessage(0);
+//
+//		return 0;
+//	}
+//
+//	// 標準のメッセージ処理を行う
+//	return DefWindowProc(hwnd, msg, wparam, lparam);
+//
+//}
+//
+//#pragma endregion
 
 //=======================
 // 関数群・構造体群
@@ -751,7 +750,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
 
 	// COMの初期化
-	assert(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
+	/*assert(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));*/
 
 	// 誰も捕捉しなかった場合(Unhandled)に捕捉する関数を登録
 	SetUnhandledExceptionFilter(ExportDump);
@@ -760,64 +759,71 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ウィンドウの生成
 	//=====================
 
-#pragma region ウィンドウの生成
+	// ポインタ
+	WindowsApi* windowsApi = nullptr;
 
-	WNDCLASS wc{};
+	// WindowsApiの初期化
+	windowsApi = new WindowsApi();
+	windowsApi->Initialize();
 
-	// ウィンドウプロシージャ
-	wc.lpfnWndProc = WindowProc;
-
-	// ウィンドウクラス名(なんでも良い)
-	wc.lpszClassName = L"FuchibeEngineWindowClass";
-
-	// インスタンスハンドル
-	wc.hInstance = GetModuleHandle(nullptr);
-
-	// カーソル
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-
-	// ウィンドウクラスを登録する
-	RegisterClass(&wc);
-
-	// クライアント領域のサイズ
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
-
-	// ウィンドウサイズを表す構造体にクライアント領域を入れる
-	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
-
-	// クライアント領域を元に実際のサイズにwrcを変更してもらう
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-	//ウィンドウの生成
-	HWND hwnd = CreateWindow(
-		// 利用するクラス名
-		wc.lpszClassName,
-		// タイトルバーの文字
-		L"FuchibeEngine",
-		// よく見るウィンドウスタイル
-		WS_OVERLAPPEDWINDOW,
-		// 表示するX座標(Windowsに任せる)
-		CW_USEDEFAULT,
-		// 表示するY座標(WindowsOSに任せる)
-		CW_USEDEFAULT,
-		// ウィンドウの横幅
-		wrc.right - wrc.left,
-		// ウィンドウの縦幅
-		wrc.bottom - wrc.top,
-		// 親ウィンドウハンドル
-		nullptr,
-		// メニューハンドル
-		nullptr,
-		// インスタンスハンドル
-		wc.hInstance,
-		// オプション
-		nullptr);
-
-	// ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
-
-#pragma endregion
+//#pragma region ウィンドウの生成
+//
+//	WNDCLASS wc{};
+//
+//	// ウィンドウプロシージャ
+//	wc.lpfnWndProc = WindowProc;
+//
+//	// ウィンドウクラス名(なんでも良い)
+//	wc.lpszClassName = L"FuchibeEngineWindowClass";
+//
+//	// インスタンスハンドル
+//	wc.hInstance = GetModuleHandle(nullptr);
+//
+//	// カーソル
+//	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+//
+//	// ウィンドウクラスを登録する
+//	RegisterClass(&wc);
+//
+//	// クライアント領域のサイズ
+//	const int32_t kClientWidth = 1280;
+//	const int32_t kClientHeight = 720;
+//
+//	// ウィンドウサイズを表す構造体にクライアント領域を入れる
+//	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
+//
+//	// クライアント領域を元に実際のサイズにwrcを変更してもらう
+//	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
+//
+//	//ウィンドウの生成
+//	HWND hwnd = CreateWindow(
+//		// 利用するクラス名
+//		wc.lpszClassName,
+//		// タイトルバーの文字
+//		L"FuchibeEngine",
+//		// よく見るウィンドウスタイル
+//		WS_OVERLAPPEDWINDOW,
+//		// 表示するX座標(Windowsに任せる)
+//		CW_USEDEFAULT,
+//		// 表示するY座標(WindowsOSに任せる)
+//		CW_USEDEFAULT,
+//		// ウィンドウの横幅
+//		wrc.right - wrc.left,
+//		// ウィンドウの縦幅
+//		wrc.bottom - wrc.top,
+//		// 親ウィンドウハンドル
+//		nullptr,
+//		// メニューハンドル
+//		nullptr,
+//		// インスタンスハンドル
+//		wc.hInstance,
+//		// オプション
+//		nullptr);
+//
+//	// ウィンドウを表示する
+//	ShowWindow(hwnd, SW_SHOW);
+//
+//#pragma endregion
 
 	//==================
 	// デバッグレイヤー
@@ -937,7 +943,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Input* input = new Input();
 
 	// 作成したインスタンスの初期化関数を呼び出す
-	input->Initialize(wc.hInstance, hwnd);
+	input->Initialize(windowsApi);
 
 	//======================
 	// XAudio2の初期化
@@ -1047,10 +1053,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 
 	// 画面の幅。ウィンドウのクライアント領域を同じサイズにしておく
-	swapChainDesc.Width = kClientWidth;
+	swapChainDesc.Width = WindowsApi::kClientWidth;
 
 	// 画面の高さ。ウィンドウのクライアント領域を同じサイズにしておく
-	swapChainDesc.Height = kClientHeight;
+	swapChainDesc.Height = WindowsApi::kClientHeight;
 
 	// 色の形式
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1068,7 +1074,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
 	// コマンドキュー、ウィンドウハンドル、スワップチェーンの設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), windowsApi->GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
 #pragma endregion
@@ -1111,7 +1117,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region DepthStencilResourceの生成
 
 	// ウィンドウと同じサイズで生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTexture(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTexture(device.Get(), WindowsApi::kClientWidth, WindowsApi::kClientHeight);
 
 #pragma endregion
 
@@ -1801,8 +1807,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	D3D12_VIEWPORT viewport{};
 
 	// クライアント領域のサイズと同じにして、画面全体に表示する
-	viewport.Width = kClientWidth;
-	viewport.Height = kClientHeight;
+	viewport.Width = WindowsApi::kClientWidth;
+	viewport.Height = WindowsApi::kClientHeight;
 	viewport.TopLeftX = 0.0f;
 	viewport.TopLeftY = 0.0f;
 	viewport.MinDepth = 0.0f;
@@ -1813,9 +1819,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 基本的にビューポートと同じ矩形が構成されるようにする
 	scissorRect.left = 0;
-	scissorRect.right = kClientWidth;
+	scissorRect.right = WindowsApi::kClientWidth;
 	scissorRect.top = 0;
-	scissorRect.bottom = kClientHeight;
+	scissorRect.bottom = WindowsApi::kClientHeight;
 
 #pragma endregion
 
@@ -1840,7 +1846,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplWin32_Init(windowsApi->GetHwnd());
 	ImGui_ImplDX12_Init(device.Get(), swapChainDesc.BufferCount, rtvDesc.Format, srvDescriptorHeap.Get(), srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -2157,7 +2163,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// 通常カメラの行列を使用
 				Matrix4x4 cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 				viewMatrix = MathUtils::Inverse(cameraMatrix);
-				projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight), 0.1f, 100.0f);
+				projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(WindowsApi::kClientWidth) / static_cast<float>(WindowsApi::kClientHeight), 0.1f, 100.0f);
 			}
 
 			// wvpMatrixを作成して更新
@@ -2405,13 +2411,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// XAudio2の解放処理
 	audioManager->Finalize();
 
-	// ウィンドウを閉じる
-	CloseWindow(hwnd);
+	//===========================
+	// WindowsApiクラスの解放処理
+	//===========================
+	
+	// WindowsAPIの終了処理
+	windowsApi->Finalize();
+
+	delete windowsApi;
+	windowsApi = nullptr;
 
 #pragma endregion
-
-	// COMの終了処理
-	CoUninitialize();
 
 	return 0;
 }
