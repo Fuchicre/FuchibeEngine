@@ -144,6 +144,24 @@ struct D3DResourceLeakChecker {
 	}
 };
 
+// BlendModeの種類
+enum BlendMode {
+	// ブレンドなし
+	kBlendModeNone,
+	// 通常αブレンド(デフォルト) Src * SrcA + Dest * (1 - SrcA)
+	kBlendModeNormal,
+	// 加算ブレンド Src * SrcA + Dest * 1
+	kBlendModeAdd,
+	// 減算ブレンド Dest * 1 - Src * SrcA
+	kBlendModeSubtract,
+	// 乗算ブレンド Src * 0 + Dest * Src
+	kBlendModeMultiply,
+	// スクリーンブレンド Src * (1 - Dest) + Dest * 1
+	kBlendModeScreen,
+	// 利用してはいけない
+	kCountOfBlendMode
+};
+
 // ログ出力用の関数
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
@@ -404,7 +422,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateTextureResource(
 	// Textureの次元数。普段使っているのは2次元
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION(metaData.dimension);
 
-	// 利用するHeapの設定。非常に特殊な運用。02_04_exで一般的なケース版がある
+	// 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 
 	// 細かい設定を行う
@@ -731,6 +749,8 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	// ④modelDataを返す //
 	return modelData;
 }
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1195,7 +1215,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region 現在時刻でのログファイルの作成
 
-	// 現在時刻を取得 (UTC時刻)
+	// 現在時刻を取得(UTC時刻)
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
 
 	// ログファイルの名前にコンマ何秒はいらないので、削って秒にする
@@ -1411,16 +1431,161 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//====================
+	//============================
 	// BlendStateの設定
-	//====================
+	//============================
 
 #pragma region BlendStateの設定
 
-	D3D12_BLEND_DESC blendDesc{};
+	//==============
+	// ブレンドなし
+	//==============
+
+#pragma region ブレンドなし
+
+	D3D12_BLEND_DESC noneBlendDesc{};
 
 	// 全ての色要素を書きこむ
-	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	noneBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+#pragma endregion
+
+	//==============
+	// 通常ブレンド
+	//==============
+
+#pragma region 通常ブレンド
+
+	D3D12_BLEND_DESC normalBlendDesc{};
+
+	// 全ての色要素を書きこむ
+	normalBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	normalBlendDesc.RenderTarget[0].BlendEnable = true;
+	normalBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	normalBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	normalBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	normalBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	normalBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	normalBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+#pragma endregion
+
+	//==============
+	// 加算ブレンド
+	//==============
+
+#pragma region 加算ブレンド
+
+	D3D12_BLEND_DESC addBlendDesc{};
+
+	// 全ての色要素を書きこむ
+	addBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	addBlendDesc.RenderTarget[0].BlendEnable = true;
+	addBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	addBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	addBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	addBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	addBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	addBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+#pragma endregion
+
+	//==============
+	// 減算ブレンド
+	//==============
+
+#pragma region 減算ブレンド
+
+	D3D12_BLEND_DESC subtractBlendDesc{};
+
+	// 全ての色要素を書きこむ
+	subtractBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	subtractBlendDesc.RenderTarget[0].BlendEnable = true;
+	subtractBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	subtractBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+	subtractBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	subtractBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	subtractBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	subtractBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+#pragma endregion
+
+	//================
+	// 乗算ブレンド
+	//================
+
+#pragma region 乗算ブレンド
+
+	D3D12_BLEND_DESC multiplyBlendDesc{};
+
+	// 全ての色要素を書きこむ
+	multiplyBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	multiplyBlendDesc.RenderTarget[0].BlendEnable = true;
+	multiplyBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
+	multiplyBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	multiplyBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
+	multiplyBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	multiplyBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	multiplyBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+#pragma endregion
+
+	//==================
+	// スクリーンブレンド
+	//==================
+
+#pragma region スクリーンブレンド
+
+	D3D12_BLEND_DESC screenBlendDesc{};
+
+	// 全ての色要素を書きこむ
+	screenBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	screenBlendDesc.RenderTarget[0].BlendEnable = true;
+	screenBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+	screenBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	screenBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	screenBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	screenBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	screenBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+#pragma endregion
+
+	// BlendModeの種類
+	enum BlendMode {
+		// ブレンドなし
+		kBlendModeNone,
+		// 通常αブレンド(デフォルト) Src * SrcA + Dest * (1 - SrcA)
+		kBlendModeNormal,
+		// 加算ブレンド Src * SrcA + Dest * 1
+		kBlendModeAdd,
+		// 減算ブレンド Dest * 1 - Src * SrcA
+		kBlendModeSubtract,
+		// 乗算ブレンド Src * 0 + Dest * Src
+		kBlendModeMultiply,
+		// スクリーンブレンド Src * (1 - Dest) + Dest * 1
+		kBlendModeScreen,
+		// 利用してはいけない
+		kCountOfBlendMode
+	};
+
+	// BlendModeの要素順に対応する BlendDesc の配列
+	D3D12_BLEND_DESC blendDescs[kCountOfBlendMode] = {
+		// kBlendModeNone
+		noneBlendDesc,
+		// kBlendModeNormal
+		normalBlendDesc,
+		// kBlendModeAdd
+		addBlendDesc,
+		// kBlendModeSubtract
+		subtractBlendDesc,
+		// kBlendModeMultiply
+		multiplyBlendDesc,
+		// kBlendModeScreen
+		screenBlendDesc
+	};
+
+	// 現在選択中のブレンドモード(初期値はブレンドなし: kBlendModeNone)
+	static int currentBlendMode = kBlendModeNone;
 
 #pragma endregion
 
@@ -1493,9 +1658,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// PixelShader
 	graphicsPilelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
 
-	// BlendState
-	graphicsPilelineStateDesc.BlendState = blendDesc;
-
 	// RasterizerState
 	graphicsPilelineStateDesc.RasterizerState = rasterizerDesc;
 
@@ -1514,10 +1676,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	graphicsPilelineStateDesc.SampleDesc.Count = 1;
 	graphicsPilelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
-	// 実際に生成する
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
-	hr = device->CreateGraphicsPipelineState(&graphicsPilelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
-	assert(SUCCEEDED(hr));
+	// 全ブレンドモードに対応するPSOを作成・保持する配列
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineStates[kCountOfBlendMode] = {};
+
+	for (size_t i = 0; i < kCountOfBlendMode; i++) {
+		// 各ブレンドモードを設定
+		graphicsPilelineStateDesc.BlendState = blendDescs[i];
+
+		// 実際に生成する
+		hr = device->CreateGraphicsPipelineState(&graphicsPilelineStateDesc, IID_PPV_ARGS(&graphicsPipelineStates[i]));
+		assert(SUCCEEDED(hr));
+	}
 
 #pragma endregion
 
@@ -1542,25 +1711,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexResourceの生成
 
-//====================================
-// 「plane.obj」のモデルとテクスチャ
-//====================================
+//================================
+// plane.objモデルとテクスチャ
+//================================
 
-	// 「plane.obj」モデルの読み込み
-	ModelData modelData1 = LoadObjFile("resources", "plane.obj");
+#pragma region plane.objモデルとテクスチャ
 
-	// 「plane.obj」モデルの頂点リソースの生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource1 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData1.vertices.size());
+	// plane.objモデルの読み込み
+	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
 
-	// Sprite用の頂点リソースを作成する
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+	// plane.objモデルの頂点リソースの生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * planeModelData.vertices.size());
+
+#pragma endregion
 
 	//================================
-	// 「axis.obj」のモデルとテクスチャ
+	// axis.objモデルとテクスチャ
 	//================================
 
-	ModelData modelData2 = LoadObjFile("resources", "axis.obj");
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource2 = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData2.vertices.size());
+#pragma region axis.objモデルとテクスチャ
+
+	ModelData axisModelData = LoadObjFile("resources", "axis.obj");
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * axisModelData.vertices.size());
+
+#pragma endregion
+
+	//================================
+	// fence.objモデルとテクスチャ
+	//================================
+
+#pragma region fence.objモデルとテクスチャ
+
+	ModelData fenceModelData = LoadObjFile("resources", "fence.obj");
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelVertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * fenceModelData.vertices.size());
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1570,76 +1755,83 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region MaterialResourceの生成
 
-	//===========================
-	// 「plane.obj」のマテリアル
-	//===========================
+	//============================
+	// plane.objモデルのマテリアル
+	//============================
+
+#pragma region plane.objモデルのマテリアル
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource1 = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
 	// マテリアルにデータを書き込む
-	Material* materialData1 = nullptr;
+	Material* planeModelMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData1));
+	planeModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialData1->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	planeModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Lightingを有効にする
-	materialData1->enableLighting = true;
-	materialData1->uvTransform = MathUtils::MakeIdentity4x4();
-
-	//===========================
-	// 「axis.obj」のマテリアル
-	//===========================
-
-	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource2 = CreateBufferResource(device.Get(), sizeof(Material));
-
-	// マテリアルにデータを書き込む
-	Material* materialData2 = nullptr;
-
-	// 書き込むためのアドレスを取得する
-	materialResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialData2));
-
-	// 構造体の各メンバにデータを代入する
-
-	// 白色にする
-	materialData2->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	// Lightingを有効にする
-	materialData2->enableLighting = true;
-	materialData2->uvTransform = MathUtils::MakeIdentity4x4();
+	planeModelMaterialData->enableLighting = true;
+	planeModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
 #pragma endregion
 
-	//================================
-	// MaterialSpriteResourceの生成
-	//================================
+	//===========================
+	// axis.objモデルのマテリアル
+	//===========================
 
-#pragma region MaterialSpriteResourceの生成
+#pragma region axis.objモデルのマテリアル
 
-	// Sprite用のMaterialResourceを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
 
-	// MaterialSpriteDataにデータを書き込む
-	Material* materialSpriteData = nullptr;
+	// マテリアルにデータを書き込む
+	Material* axisModelMaterialData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	materialResourceSprite.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialSpriteData));
+	axisModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&axisModelMaterialData));
 
 	// 構造体の各メンバにデータを代入する
 
 	// 白色にする
-	materialSpriteData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	axisModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	// SpriteはLightingしないのでfalseにする
-	materialSpriteData->enableLighting = false;
+	// Lightingを有効にする
+	axisModelMaterialData->enableLighting = true;
+	axisModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
 
-	materialSpriteData->uvTransform = MathUtils::MakeIdentity4x4();
+#pragma endregion
+
+	//===========================
+	// fence.objモデルのマテリアル
+	//===========================
+
+#pragma region fence.objモデルのマテリアル
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelMaterialResource = CreateBufferResource(device.Get(), sizeof(Material));
+
+	// マテリアルにデータを書き込む
+	Material* fenceModelMaterialData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	fenceModelMaterialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&fenceModelMaterialData));
+
+	// 構造体の各メンバにデータを代入する
+
+	// 白色にする
+	fenceModelMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Lightingを有効にする
+	fenceModelMaterialData->enableLighting = true;
+	fenceModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1668,23 +1860,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//===========================
-	// IndexResourceSpriteの生成
-	//===========================
-
-#pragma region IndexResourceSpriteの生成
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
-
-#pragma endregion
-
 	//====================================
 	// TransformMatrixResourceの生成
 	//====================================
 
 #pragma region TransformMatrixResourceの生成
 
-	// SphereのWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	// モデルのWVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
 
 	// データを書き込む
@@ -1699,21 +1881,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
 	*(wvpData + 1) = MathUtils::MakeIdentity4x4();
 
-	// Sprite用もWVP用と同様にMatrix4x4 2つ分 のサイズ(128バイト)を用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(Matrix4x4) * 2);
-
-	// データを書き込む
-	Matrix4x4* transformMatrixDataSprite = nullptr;
-
-	// 書き込むためのアドレスを取得
-	transformMatrixResourceSprite.Get()->Map(0, nullptr, reinterpret_cast<void**>(&transformMatrixDataSprite));
-
-	// 1つ目の行列(wvp用)に単位行列を書き込む
-	*transformMatrixDataSprite = MathUtils::MakeIdentity4x4();
-
-	// 2つ目の行列(world用)にも単位行列を書き込む(+1 して次のアドレスへ)
-	*(transformMatrixDataSprite + 1) = MathUtils::MakeIdentity4x4();
-
 #pragma endregion
 
 	//===========================
@@ -1723,36 +1890,65 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region VertexBafferViewの設定
 
 	//=======================
-	// 「plane.obj」モデル
+	// plane.objモデル
 	//=======================
 
-	// 「plane.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView1{};
+#pragma region plane.objモデル
+
+	// plane.objモデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW planeModelVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
-	vertexBufferView1.BufferLocation = vertexResource1.Get()->GetGPUVirtualAddress();
+	planeModelVertexBufferView.BufferLocation = planeModelVertexResource.Get()->GetGPUVirtualAddress();
 
 	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView1.SizeInBytes = UINT(sizeof(VertexData) * modelData1.vertices.size());
+	planeModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * planeModelData.vertices.size());
 
 	// 1頂点あたりのサイズ
-	vertexBufferView1.StrideInBytes = sizeof(VertexData);
+	planeModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
 
 	//=======================
-	// 「axis.obj」モデル
+	// axis.objモデル
 	//=======================
 
-	// 「axis.obj」モデルの頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView2{};
+#pragma region axis.objモデル
+
+	// axis.objモデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW axisModelVertexBufferView{};
 
 	// リソースの先頭アドレスから使う
-	vertexBufferView2.BufferLocation = vertexResource2.Get()->GetGPUVirtualAddress();
+	axisModelVertexBufferView.BufferLocation = axisModelVertexResource.Get()->GetGPUVirtualAddress();
 
 	// VertexResourceで計算した正しいバイトサイズを設定する
-	vertexBufferView2.SizeInBytes = UINT(sizeof(VertexData) * modelData2.vertices.size());
+	axisModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * axisModelData.vertices.size());
 
 	// 1頂点あたりのサイズ
-	vertexBufferView2.StrideInBytes = sizeof(VertexData);
+	axisModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
+	//======================
+	// fence.objモデル
+	//======================
+
+#pragma region fence.objモデル
+
+	// fence.objモデルの頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW fenceModelVertexBufferView{};
+
+	// リソースの先頭アドレスから使う
+	fenceModelVertexBufferView.BufferLocation = fenceModelVertexResource.Get()->GetGPUVirtualAddress();
+
+	// VertexResourceで計算した正しいバイトサイズを設定する
+	fenceModelVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * fenceModelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	fenceModelVertexBufferView.StrideInBytes = sizeof(VertexData);
+
+#pragma endregion
+
 #pragma endregion
 
 	//================================
@@ -1762,32 +1958,58 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Resourceに頂点データを書きこむ
 
 	//=======================
-	// 「plane.obj」のモデル
+	// plane.objモデル
 	//=======================
 
-	// 「plane.obj」モデルの頂点リソースにデータを書き込む
-	VertexData* vertexData1 = nullptr;
+#pragma region plane.objモデル
+
+	// plane.objモデルの頂点リソースにデータを書き込む
+	VertexData* planeModelVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	vertexResource1.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData1));
+	planeModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&planeModelVertexData));
 
 	// 頂点データをリソースにコピー
-	std::memcpy(vertexData1, modelData1.vertices.data(), sizeof(VertexData) * modelData1.vertices.size());
-	vertexResource1.Get()->Unmap(0, nullptr);
+	std::memcpy(planeModelVertexData, planeModelData.vertices.data(), sizeof(VertexData) * planeModelData.vertices.size());
+	planeModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
 
 	//=======================
-	// 「axis.obj」のモデル
+	// axis.objモデル
 	//=======================
 
-	// 「axis.obj」モデルの頂点リソースにデータを書き込む
-	VertexData* vertexData2 = nullptr;
+#pragma region axis.objモデル
+
+	// axis.objモデルの頂点リソースにデータを書き込む
+	VertexData* axisModelVertexData = nullptr;
 
 	// 書き込むためのアドレスを取得する
-	vertexResource2.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData2));
+	axisModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&axisModelVertexData));
 
 	// 頂点データをリソースにコピー
-	std::memcpy(vertexData2, modelData2.vertices.data(), sizeof(VertexData) * modelData2.vertices.size());
-	vertexResource2.Get()->Unmap(0, nullptr);
+	std::memcpy(axisModelVertexData, axisModelData.vertices.data(), sizeof(VertexData) * axisModelData.vertices.size());
+	axisModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
+
+	//=======================
+	// fence.objモデル
+	//=======================
+
+#pragma region fence.objモデル
+
+	// fence.objモデルの頂点リソースにデータを書き込む
+	VertexData* fenceModelVertexData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	fenceModelVertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&fenceModelVertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(fenceModelVertexData, fenceModelData.vertices.data(), sizeof(VertexData) * fenceModelData.vertices.size());
+	fenceModelVertexResource.Get()->Unmap(0, nullptr);
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1826,7 +2048,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Transform変数の作成
 
 	// モデル用のTransformを作成する
-	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform planeModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform axisModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform fenceModelTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, static_cast<float>(M_PI), 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 #pragma endregion
 
@@ -1871,24 +2095,46 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Textureを読み込んで転送する
 
 	//==========================================
-	// 「plane.obj」のモデルのテクスチャを読み込む
+	// plane.objモデルのテクスチャを読み込む
 	//==========================================
 
-	DirectX::ScratchImage mipImages1 = LoadTexture(modelData1.material.textureFilePath);
-	const DirectX::TexMetadata& metadata1 = mipImages1.GetMetadata();
+#pragma region plane.objモデル
+
+	DirectX::ScratchImage planeModelMipImages = LoadTexture(planeModelData.material.textureFilePath);
+	const DirectX::TexMetadata& planeModelMetadata = planeModelMipImages.GetMetadata();
 
 	// リソース作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource1 = CreateTextureResource(device.Get(), metadata1);
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = CreateTextureResource(device.Get(), planeModelMetadata);
+
+#pragma endregion
 
 	//===========================================
-	// 「axis.obj」のモデルのテクスチャを読み込む
+	// axis.objモデルのテクスチャを読み込む
 	//===========================================
 
-	DirectX::ScratchImage mipImages2 = LoadTexture(modelData2.material.textureFilePath);
-	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
+#pragma region axis.objモデル
+
+	DirectX::ScratchImage axisModelMipImages = LoadTexture(axisModelData.material.textureFilePath);
+	const DirectX::TexMetadata& axisModelMetadata = axisModelMipImages.GetMetadata();
 
 	// リソース作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(device.Get(), metadata2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelTextureResource = CreateTextureResource(device.Get(), axisModelMetadata);
+
+#pragma endregion
+
+	//===========================================
+	// fence.objモデルのテクスチャを読み込む
+	//===========================================
+
+#pragma region fence.objモデル
+
+	DirectX::ScratchImage fenceModelMipImages = LoadTexture(fenceModelData.material.textureFilePath);
+	const DirectX::TexMetadata& fenceModelMetadata = fenceModelMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelTextureResource = CreateTextureResource(device.Get(), fenceModelMetadata);
+
+#pragma endregion
 
 #pragma endregion
 
@@ -1898,19 +2144,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region コマンドを実行して完了を待つ
 
-	//===============================
-	// 「plane.obj」のテクスチャを転送
-	//===============================
+	//=================================
+	// plane.objモデルのテクスチャを転送
+	//=================================
+
+#pragma region plane.objモデルのテクスチャを転送
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource1 = UploadTextureData(textureResource1.Get(), mipImages1, device.Get(), commandList.Get());
+	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelIntermediateResource = UploadTextureData(planeModelTextureResource.Get(), planeModelMipImages, device.Get(), commandList.Get());
+
+#pragma endregion
 
 	//===============================
-	// 「axis.obj」のテクスチャを転送
+	// axis.objモデルのテクスチャを転送
 	//===============================
+
+#pragma region axis.objモデルのテクスチャを転送
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = UploadTextureData(textureResource2.Get(), mipImages2, device.Get(), commandList.Get());
+	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelIntermediateResource = UploadTextureData(axisModelTextureResource.Get(), axisModelMipImages, device.Get(), commandList.Get());
+
+#pragma endregion
+
+	//================================
+	// fence.objモデルのテクスチャを転送
+	//================================
+
+#pragma region fence.objモデルのテクスチャを転送
+
+	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
+	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelIntermediateResource = UploadTextureData(fenceModelTextureResource.Get(), fenceModelMipImages, device.Get(), commandList.Get());
+
+#pragma endregion
 
 	// CommandListをCloseし、commandQueue->ExecuteCommandListsを使いキックする
 	hr = commandList->Close();
@@ -1933,8 +2198,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-#pragma endregion
-
 	//==========================
 	// SRVDescriptorHeapの生成
 	//==========================
@@ -1942,19 +2205,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region SRVDescriptorHeapの生成
 
 	//===========================================
-	// 「plane.obj」のテクスチャのSRVを作成
+	// plane.objモデルのテクスチャのSRVを作成
 	//===========================================
 
+#pragma region plane.objモデルのテクスチャのSRVを作成
+
 	// metaDataを基にSRVを作成
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc1{};
-	srvDesc1.Format = metadata1.format;
-	srvDesc1.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	D3D12_SHADER_RESOURCE_VIEW_DESC planeModelSrvDesc{};
+	planeModelSrvDesc.Format = planeModelMetadata.format;
+	planeModelSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 	// 2Dテクスチャ
-	srvDesc1.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	planeModelSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
 	// テクスチャリソースが持っているすべてのミップマップレベルを自動的にすべて割り当てる(符号なし整数の最大値を直接表す「0xFFFFFFFF」に書き換える)
-	srvDesc1.Texture2D.MipLevels = 0xFFFFFFFF;
+	planeModelSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
 
 	// SRVを作成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU1 = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -1965,19 +2230,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	textureSrvHandleGPU1.ptr += descriptorSizeSRV;
 
 	// SRVを作成(インデックス1の場所に書き込まれる)
-	device->CreateShaderResourceView(textureResource1.Get(), &srvDesc1, textureSrvHandleCPU1);
+	device->CreateShaderResourceView(planeModelTextureResource.Get(), &planeModelSrvDesc, textureSrvHandleCPU1);
+
+#pragma endregion
 
 	//===========================================
-	// 「axis.obj」のテクスチャのSRVを作成
+	// axis.objモデルのテクスチャのSRVを作成
 	//===========================================
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-	srvDesc2.Format = metadata2.format;
-	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+#pragma region axis.objモデルのテクスチャのSRVを作成
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC axisModelSrvDesc{};
+	axisModelSrvDesc.Format = axisModelMetadata.format;
+	axisModelSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 	// 2Dテクスチャ
-	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc2.Texture2D.MipLevels = 0xFFFFFFFF;
+	axisModelSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	axisModelSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = textureSrvHandleCPU1;
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = textureSrvHandleGPU1;
@@ -1986,7 +2255,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	textureSrvHandleGPU2.ptr += descriptorSizeSRV;
 
 	// SRVを作成(インデックス2の場所に書き込まれる)
-	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+	device->CreateShaderResourceView(axisModelTextureResource.Get(), &axisModelSrvDesc, textureSrvHandleCPU2);
+
+#pragma endregion
+
+	//===========================================
+	// fence.objモデルのテクスチャのSRVを作成
+	//===========================================
+
+#pragma region fence.objモデルのテクスチャのSRVを作成
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC fenceModelSrvDesc{};
+	fenceModelSrvDesc.Format = fenceModelMetadata.format;
+	fenceModelSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	fenceModelSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	fenceModelSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU3 = textureSrvHandleCPU2;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU3 = textureSrvHandleGPU2;
+
+	textureSrvHandleCPU3.ptr += descriptorSizeSRV;
+	textureSrvHandleGPU3.ptr += descriptorSizeSRV;
+
+	// SRVを作成(インデックス3の場所に書き込まれる)
+	device->CreateShaderResourceView(fenceModelTextureResource.Get(), &fenceModelSrvDesc, textureSrvHandleCPU3);
+
+#pragma endregion
 
 #pragma endregion
 
@@ -2001,13 +2297,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma endregion
 
 	//============================
-	// スプライトの位置を保持する変数
+	// カメラのTransform変数
 	//============================
 
-#pragma region スプライトの位置を保持する変数
-
-	// スプライトの位置(X, Y)初期値は(0, 0)
-	float spritePos[2] = { 0.0f, 0.0f };
+#pragma region カメラのTransform変数
 
 	// カメラのTransform(Zの初期値を -10.0f に設定)
 	Transform cameraTransform{ {1.0f, 1.0f, 1.0f},{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
@@ -2018,7 +2311,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ImGuiの切り替え用の変数
 	//=======================
 
-	// 0: plane.obj, 1: axis.obj
+	// 0: plane.obj, 1: axis.obj, 2: fence.obj
 	int currentModelIndex = 0;
 
 	//=====================
@@ -2056,7 +2349,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 			ImGui::Begin("Settings");
 
+			//===========================================
+			// ブレンドモード切り替え用UI
+			//===========================================
+
+			ImGui::Separator();
+			ImGui::Text("- Blend Mode -");
+			const char* blendModeItems[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+			ImGui::Combo("Blend Mode", &currentBlendMode, blendModeItems, IM_ARRAYSIZE(blendModeItems));
+
+			//===========================================
 			// カメラ切り替え用UI
+			//===========================================
+
 			ImGui::Separator();
 			ImGui::Text("- Camera -");
 			ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
@@ -2068,49 +2373,80 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				}
 			}
 
-			ImGui::Separator();
-
+			//===========================================
 			// モデルのトランスフォーム操作UI
-			ImGui::Text("-Model (plane.obj) Transform-");
+			//===========================================
+
+			ImGui::Separator();
+			ImGui::Text("-Model Transform-");
 
 			// 各軸の回転を操作するスライダー
-			ImGui::SliderFloat3("Model Rotation", &transform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+			ImGui::SliderFloat3("Model Rotation", &planeModelTransform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
 
-			ImGui::DragFloat3("Model Scale", &transform.scale.x, 0.1f);
+			ImGui::DragFloat3("Model Scale", &planeModelTransform.scale.x, 0.1f);
 
 			// リセット時の値をY軸180度にする
 			if (ImGui::Button("Reset Rotation")) {
 				// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
-				transform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+				planeModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
 			}
 
-			ImGui::Separator();
-
+			//===========================================
 			// SpriteのUV座標系を動かせる
+			//===========================================
+
+			ImGui::Separator();
 			ImGui::Text("UV Transform");
 			ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
 
-			ImGui::Separator();
-
+			//===========================================
 			// モデルの切り替えラジオボタン
+			//===========================================
+
+			ImGui::Separator();
 			ImGui::Text("-Select Model-");
 			ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
 			ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
+			ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
 
-			ImGui::Separator();
+			// 選択中のモデルに応じてポインタを切り替え
+			Transform* currentTransform = &planeModelTransform;
+			Material* currentMaterialData = planeModelMaterialData;
 
+			// switch文での参照ポインタ切替
+			switch (currentModelIndex) {
+			case 0:
+				currentTransform = &planeModelTransform;
+				currentMaterialData = planeModelMaterialData;
+				break;
+			case 1:
+				currentTransform = &axisModelTransform;
+				currentMaterialData = axisModelMaterialData;
+				break;
+			case 2:
+				currentTransform = &fenceModelTransform;
+				currentMaterialData = fenceModelMaterialData;
+				break;
+			}
+
+			//===========================================
 			// 色編集用のImGui
-			ImGui::ColorEdit3("Sphere Color", &materialData1->color.x);
+			//===========================================
 
 			ImGui::Separator();
+			ImGui::ColorEdit4("Sphere Color", &planeModelMaterialData->color.x);
 
+			//===========================================
 			// ライトの設定
+			//===========================================
+
+			ImGui::Separator();
 			ImGui::Text("Directional Light");
 
 			// ライトの色変更
-			ImGui::ColorEdit3("Light Color", &directionalLightData->color.x);
+			ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
 
 			// ライトの輝度(0.0 ~ 10.0 程度まで動かせるように設定)
 			ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 10.0f);
@@ -2125,9 +2461,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			ImGui::End();
 #endif
 
-			// === データの計算・定数バッファの更新 === //
-			
-			// === デバッグカメラの更新(行列計算の前に呼び出す)=== //
+			//===========================================
+			// デバッグカメラの更新
+			//===========================================
+
+#pragma region デバッグカメラの更新
+
 			if (useDebugCamera) {
 #ifdef USE_IMGUI
 				// キーボードもマウスもImGuiが操作中でない時だけカメラを動かす
@@ -2140,10 +2479,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif
 			}
 
-			// === データの計算・定数バッファの更新 === //
+#pragma endregion
+
+			//===========================================
+			// データの計算・定数バッファの更新
+			//===========================================
+
+#pragma region データの計算・定数バッファの更新
 
 			// WorldMatrixを作成
-			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(planeModelTransform.scale, planeModelTransform.rotate, planeModelTransform.translate);
 
 			// ビュー行列と射影行列の宣言
 			Matrix4x4 viewMatrix;
@@ -2173,13 +2518,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
 
 			if (currentModelIndex == 0) {
-				materialData1->uvTransform = uvTransformMatrix;
+				planeModelMaterialData->uvTransform = uvTransformMatrix;
 			} else {
-				materialData2->uvTransform = uvTransformMatrix;
+				axisModelMaterialData->uvTransform = uvTransformMatrix;
 			}
 
 			// 描画用の頂点数を決定
-			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(modelData1.vertices.size()) : UINT(modelData2.vertices.size());
+			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(planeModelData.vertices.size()) : UINT(axisModelData.vertices.size());
+
+#pragma endregion
 
 			// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -2262,7 +2609,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootSignature(rootSignature.Get());
 
 			// PSOを設定する
-			commandList->SetPipelineState(graphicsPipelineState.Get());
+			commandList->SetPipelineState(graphicsPipelineStates[currentBlendMode].Get());
 
 			// トポロジ(形状)を設定する。PSOに設定しているものとはまた別。同じものを設定すると考えておくといい
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -2282,16 +2629,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
 			if (currentModelIndex == 0) {
-
 				// Plane の描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource1.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView1);
+				commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
-			} else {
+			} else if (currentModelIndex == 1) {
 				// Axisの描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, materialResource2.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferView2);
+				commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
+			} else if (currentModelIndex == 2) {
+				// Fenceの描画設定
+				commandList->SetGraphicsRootConstantBufferView(0, fenceModelMaterialResource.Get()->GetGPUVirtualAddress());
+				commandList->IASetVertexBuffers(0, 1, &fenceModelVertexBufferView);
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
 			}
 
 			// 確定した正しい頂点数(activeVertexCount)で、この1回だけ描画する
