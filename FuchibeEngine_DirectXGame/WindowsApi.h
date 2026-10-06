@@ -15,14 +15,11 @@ public:
 	// 初期化関数
 	void Initialize();
 
-	// 更新関数
-	void Update();
+	// システムメッセージの処理関数
+	bool ProcessMessage();
 
 	// 終了関数
 	void Finalize();
-
-	// システムメッセージの処理関数
-	bool ProcessMessage();
 
 private:
 
@@ -41,6 +38,7 @@ public:
 	// getter
 	HWND GetHwnd() const { return hwnd; }
 
+	// getter
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
 
 };

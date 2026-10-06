@@ -8,26 +8,26 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 LRESULT WindowsApi::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 #ifdef USE_IMGUI
-		if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
-			return true;
-		}
-#endif
-		// メッセージに応じてゲーム固有の処理を行う
-		switch (msg) {
-
-			// ウィンドウが破棄された
-		case WM_DESTROY:
-
-			// OSに対して、アプリの終了を伝える
-			PostQuitMessage(0);
-
-			return 0;
-		}
-
-		// 標準のメッセージ処理を行う
-		return DefWindowProc(hwnd, msg, wparam, lparam);
-
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
+		return true;
 	}
+#endif
+	// メッセージに応じてゲーム固有の処理を行う
+	switch (msg) {
+
+		// ウィンドウが破棄された
+	case WM_DESTROY:
+
+		// OSに対して、アプリの終了を伝える
+		PostQuitMessage(0);
+
+		return 0;
+	}
+
+	// 標準のメッセージ処理を行う
+	return DefWindowProc(hwnd, msg, wparam, lparam);
+
+}
 
 // 初期化関数
 void WindowsApi::Initialize() {
@@ -94,9 +94,23 @@ void WindowsApi::Initialize() {
 
 }
 
-// 更新関数
-void WindowsApi::Update() {
+// システムメッセージの処理関数
+bool WindowsApi::ProcessMessage() {
 
+	MSG msg{};
+
+	// ウィンドウにメッセージが来たら、最優先で処理する
+	if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		// メッセージがある場合は、翻訳して、ウィンドウプロシージャに渡す
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	if (msg.message == WM_QUIT) {
+		return true;
+	}
+
+	return false;
 }
 
 // 終了関数
@@ -108,9 +122,4 @@ void WindowsApi::Finalize() {
 	// COMの終了処理
 	CoUninitialize();
 
-}
-
-// システムメッセージの処理関数
-bool WindowsApi::ProcessMessage() {
-	return false;
 }
