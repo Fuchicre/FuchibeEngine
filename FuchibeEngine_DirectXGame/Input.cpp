@@ -6,7 +6,10 @@
 /// <summary>
 /// DirectInputおよびキーボードデバイスの初期化処理
 /// </summary>
-void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
+void Input::Initialize(WindowsApi* windowsApi) {
+
+	// 借りてきたWindowsApiのインスタンスを記録する
+	this->windowsApi = windowsApi;
 
 	//=========================
 	// DirectInput全体の初期化
@@ -25,8 +28,8 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 
 	// DirectInputのAPIを呼び出して、全体の管理オブジェクト(システム)を作成
 	hr = DirectInput8Create(
-		 // wc.hInstance(アプリケーションのインスタンスハンドル)
-		hInstance,
+		 // windowsApi->GetHInstance()(アプリケーションのインスタンスハンドル)
+		windowsApi->GetHInstance(),
 		// 使用するDirectInputのバージョン
 		DIRECTINPUT_VERSION,
 		// 使用したいインタフェースのID
@@ -80,7 +83,7 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 
 	hr = keyboard->SetCooperativeLevel(
 		// ウィンドウハンドル
-		hwnd,
+		windowsApi->GetHwnd(),
 		// 前面・非排他・Windowsキーを無効
 		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY
 	);
@@ -121,7 +124,7 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd) {
 #pragma region 排他制御レベルのセット(マウス)
 
 	hr = mouse->SetCooperativeLevel(
-		hwnd,
+		windowsApi->GetHwnd(),
 		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE
 	);
 	assert(SUCCEEDED(hr));
