@@ -27,7 +27,7 @@ struct Camera {
 	Vector3 pos;
 };
 
-class MathUtils{
+class MathUtils {
 
 public:
 
@@ -81,7 +81,5 @@ public:
 	static Vector3 Normalize(const Vector3& vector);
 
 public:
-
 	static Camera camera;
-
 };

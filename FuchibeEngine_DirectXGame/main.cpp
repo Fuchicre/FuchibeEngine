@@ -632,14 +632,12 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	std::string line;
 
 	// ②ファイルを開く //
-
 	std::ifstream file(directoryPath + "/" + filename);
 
 	// とりあえず開けなかったら止める
 	assert(file.is_open());
 
 	// ③実際にファイルを読み、ModelDataを構築していく //
-
 	while (std::getline(file, line)) {
 
 		std::string identifier;
@@ -2255,22 +2253,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef USE_IMGUI
 		ImGui::Begin("Settings");
 
-			//===========================================
-			// ブレンドモード切り替え用UI
-			//===========================================
+		//===========================================
+		// ブレンドモード切り替え用UI
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("- Blend Mode -");
-			const char* blendModeItems[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
-			ImGui::Combo("Blend Mode", &currentBlendMode, blendModeItems, IM_ARRAYSIZE(blendModeItems));
+		ImGui::Separator();
+		ImGui::Text("- Blend Mode -");
+		const char* blendModeItems[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+		ImGui::Combo("Blend Mode", &currentBlendMode, blendModeItems, IM_ARRAYSIZE(blendModeItems));
 
-			//===========================================
-			// カメラ切り替え用UI
-			//===========================================
+		//===========================================
+		// カメラ切り替え用UI
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("- Camera -");
-			ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
+		ImGui::Separator();
+		ImGui::Text("- Camera -");
+		ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
 
 		// デバッグカメラのリセットボタン
 		if (useDebugCamera) {
@@ -2279,80 +2277,80 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 		}
 
-			//===========================================
-			// モデルのトランスフォーム操作UI
-			//===========================================
+		//===========================================
+		// モデルのトランスフォーム操作UI
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("-Model Transform-");
+		ImGui::Separator();
+		ImGui::Text("-Model Transform-");
 
-			// 各軸の回転を操作するスライダー
-			ImGui::SliderFloat3("Model Rotation", &planeModelTransform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+		// 各軸の回転を操作するスライダー
+		ImGui::SliderFloat3("Model Rotation", &planeModelTransform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
 
-			ImGui::DragFloat3("Model Scale", &planeModelTransform.scale.x, 0.1f);
+		ImGui::DragFloat3("Model Scale", &planeModelTransform.scale.x, 0.1f);
 
-			// リセット時の値をY軸180度にする
-			if (ImGui::Button("Reset Rotation")) {
-				// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
-				planeModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
-			}
+		// リセット時の値をY軸180度にする
+		if (ImGui::Button("Reset Rotation")) {
+			// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
+			planeModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+		}
 
-			//===========================================
-			// SpriteのUV座標系を動かせる
-			//===========================================
+		//===========================================
+		// SpriteのUV座標系を動かせる
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("UV Transform");
-			ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
+		ImGui::Separator();
+		ImGui::Text("UV Transform");
+		ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+		ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+		ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
 
-			//===========================================
-			// モデルの切り替えラジオボタン
-			//===========================================
+		//===========================================
+		// モデルの切り替えラジオボタン
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("-Select Model-");
-			ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
-			ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
-			ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
+		ImGui::Separator();
+		ImGui::Text("-Select Model-");
+		ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
+		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
+		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
 
-			// 選択中のモデルに応じてポインタを切り替え
-			Transform* currentTransform = &planeModelTransform;
-			Material* currentMaterialData = planeModelMaterialData;
+		// 選択中のモデルに応じてポインタを切り替え
+		Transform* currentTransform = &planeModelTransform;
+		Material* currentMaterialData = planeModelMaterialData;
 
-			// switch文での参照ポインタ切替
-			switch (currentModelIndex) {
-			case 0:
-				currentTransform = &planeModelTransform;
-				currentMaterialData = planeModelMaterialData;
-				break;
-			case 1:
-				currentTransform = &axisModelTransform;
-				currentMaterialData = axisModelMaterialData;
-				break;
-			case 2:
-				currentTransform = &fenceModelTransform;
-				currentMaterialData = fenceModelMaterialData;
-				break;
-			}
+		// switch文での参照ポインタ切替
+		switch (currentModelIndex) {
+		case 0:
+			currentTransform = &planeModelTransform;
+			currentMaterialData = planeModelMaterialData;
+			break;
+		case 1:
+			currentTransform = &axisModelTransform;
+			currentMaterialData = axisModelMaterialData;
+			break;
+		case 2:
+			currentTransform = &fenceModelTransform;
+			currentMaterialData = fenceModelMaterialData;
+			break;
+		}
 
-			//===========================================
-			// 色編集用のImGui
-			//===========================================
+		//===========================================
+		// 色編集用のImGui
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::ColorEdit4("Sphere Color", &planeModelMaterialData->color.x);
+		ImGui::Separator();
+		ImGui::ColorEdit4("Sphere Color", &planeModelMaterialData->color.x);
 
-			//===========================================
-			// ライトの設定
-			//===========================================
+		//===========================================
+		// ライトの設定
+		//===========================================
 
-			ImGui::Separator();
-			ImGui::Text("Directional Light");
+		ImGui::Separator();
+		ImGui::Text("Directional Light");
 
-			// ライトの色変更
-			ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
+		// ライトの色変更
+		ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
 
 		// ライトの輝度(0.0 ~ 10.0 程度まで動かせるように設定)
 		ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 10.0f);
@@ -2366,8 +2364,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		ImGui::End();
 #endif
-
-		// === データの計算・定数バッファの更新 === //
 
 		// === デバッグカメラの更新(行列計算の前に呼び出す)=== //
 		if (useDebugCamera) {
@@ -2384,8 +2380,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// === データの計算・定数バッファの更新 === //
 
-			// WorldMatrixを作成
-			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(planeModelTransform.scale, planeModelTransform.rotate, planeModelTransform.translate);
+		// WorldMatrixを作成
+		Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(planeModelTransform.scale, planeModelTransform.rotate, planeModelTransform.translate);
 
 		// ビュー行列と射影行列の宣言
 		Matrix4x4 viewMatrix;
@@ -2414,14 +2410,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(uvTransformSprite.rotate.z));
 		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
 
-			if (currentModelIndex == 0) {
-				planeModelMaterialData->uvTransform = uvTransformMatrix;
-			} else {
-				axisModelMaterialData->uvTransform = uvTransformMatrix;
-			}
+		if (currentModelIndex == 0) {
+			planeModelMaterialData->uvTransform = uvTransformMatrix;
+		} else {
+			axisModelMaterialData->uvTransform = uvTransformMatrix;
+		}
 
-			// 描画用の頂点数を決定
-			UINT activeVertexCount = (currentModelIndex == 0) ? UINT(planeModelData.vertices.size()) : UINT(axisModelData.vertices.size());
+		// 描画用の頂点数を決定
+		UINT activeVertexCount = (currentModelIndex == 0) ? UINT(planeModelData.vertices.size()) : UINT(axisModelData.vertices.size());
 
 #pragma endregion
 
@@ -2505,8 +2501,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// RootSignatureを設定する。PSOにも設定しているが、別途設定が必要
 		commandList->SetGraphicsRootSignature(rootSignature.Get());
 
-			// PSOを設定する
-			commandList->SetPipelineState(graphicsPipelineStates[currentBlendMode].Get());
+		// PSOを設定する
+		commandList->SetPipelineState(graphicsPipelineStates[currentBlendMode].Get());
 
 		// トポロジ(形状)を設定する。PSOに設定しているものとはまた別。同じものを設定すると考えておくといい
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -2524,23 +2520,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 共通のWVP行列設定
 		commandList->SetGraphicsRootConstantBufferView(1, wvpResource.Get()->GetGPUVirtualAddress());
 
-			// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
-			if (currentModelIndex == 0) {
-				// Plane の描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
-				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
-			} else if (currentModelIndex == 1) {
-				// Axisの描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
-				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
-			} else if (currentModelIndex == 2) {
-				// Fenceの描画設定
-				commandList->SetGraphicsRootConstantBufferView(0, fenceModelMaterialResource.Get()->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &fenceModelVertexBufferView);
-				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
-			}
+		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
+		if (currentModelIndex == 0) {
+			// Plane の描画設定
+			commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
+			commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
+		} else if (currentModelIndex == 1) {
+			// Axisの描画設定
+			commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
+			commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
+		} else if (currentModelIndex == 2) {
+			// Fenceの描画設定
+			commandList->SetGraphicsRootConstantBufferView(0, fenceModelMaterialResource.Get()->GetGPUVirtualAddress());
+			commandList->IASetVertexBuffers(0, 1, &fenceModelVertexBufferView);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
+		}
 
 		// 確定した正しい頂点数(activeVertexCount)で、この1回だけ描画する
 		commandList->DrawInstanced(activeVertexCount, 1, 0, 0);

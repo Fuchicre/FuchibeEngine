@@ -40,5 +40,4 @@ public:
 
 	// getter
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
-
 };
