@@ -22,7 +22,6 @@ public:
 	};
 
 public:
-
 	// namespace省略
 	template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -30,9 +29,8 @@ public:
 	/// <summary>
 	/// DirectInputおよびキーボード・マウスデバイスの初期化処理
 	/// </summary>
-	/// <param name="hInstance">アプリケーションのインスタンスハンドル</param>
-	/// <param name="hwnd">操作対象となるウィンドウのハンドル</param>
-	void Initialize(WindowsApi* windowsApi);
+	/// <param name="pWindowsApi">WindowsApiインスタンスへのポインタ</param>
+	void Initialize(WindowsApi* pWindowsApi);
 
 	/// <summary>
 	/// 毎フレームの最初に入力状態を更新する処理(元の取得処理を内包)

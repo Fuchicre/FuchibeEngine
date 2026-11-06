@@ -4,17 +4,49 @@
 #include <wrl.h>
 #include "WindowsApi.h"
 #include <array>
+#include <string>
+#include <dxcapi.h>
+#include "externals/DirectXTex/DirectXTex.h"
 
 class DirectXPlatform {
 public:
-	// 初期化関数 (ハイフンと改行を修正)
-	void Initialize(WindowsApi* windowsApi);
+	// 初期化関数
+	void Initialize(WindowsApi* pWindowsApi);
 
 	// SRVの指定番号のCPUデスクリプタハンドルを取得する関数
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
 
 	// SRVの指定番号のGPUデスクリプタハンドルを取得する関数
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
+
+	ID3D12Device* GetDevice() const { return device.Get(); }
+	ID3D12GraphicsCommandList* GetCommandList() const { return commandList.Get(); }
+
+	// CompileShader関数
+	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
+		const std::wstring& filePath,
+		const wchar_t* profile);
+
+	// リソース生成関数
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes);
+
+	// テクスチャリソースの生成関数
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateTextureResource(
+		const DirectX::TexMetadata& metaData);
+
+	// リソース転送関数
+	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(
+		const Microsoft::WRL::ComPtr<ID3D12Resource>& texture,
+		const DirectX::ScratchImage& mipImages);
+
+	// テクスチャファイル読み込み関数
+	static DirectX::ScratchImage LoadTexture(const std::string& filePath);
+
+	// 描画前処理関数
+	void PreDraw();
+
+	// 描画後処理関数
+	void PostDraw();
 
 private:
 	// デバイスの生成関数
@@ -28,7 +60,6 @@ private:
 
 	// 深度バッファの生成関数
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthBuffer(
-		const Microsoft::WRL::ComPtr<ID3D12Device>& device,
 		int32_t width,
 		int32_t height);
 
@@ -75,7 +106,7 @@ private:
 		uint32_t index);
 
 private:
-	// WindowsAPI (ハイフンと型名の繋がりを修正)
+	// WindowsAPI
 	WindowsApi* windowsApi = nullptr;
 
 	// DirectX12デバイス
@@ -111,6 +142,17 @@ private:
 
 	// フェンス
 	Microsoft::WRL::ComPtr<ID3D12Fence> fence;
+	uint64_t fenceValue = 0;
+	HANDLE fenceEvent = nullptr;
+
+	// ビューポートとシザー矩形
+	D3D12_VIEWPORT viewport{};
+	D3D12_RECT scissorRect{};
+
+	// DXC関連
+	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler> dxcIncludeHandler;
 
 	static constexpr UINT kBufferCount = 2;
 	static constexpr DXGI_FORMAT kRtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;

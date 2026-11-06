@@ -6,15 +6,14 @@
 /// <summary>
 /// DirectInputおよびキーボードデバイスの初期化処理
 /// </summary>
-void Input::Initialize(WindowsApi* windowsApi) {
+void Input::Initialize(WindowsApi* pWindowsApi) {
 
 	// 借りてきたWindowsApiのインスタンスを記録する
-	this->windowsApi = windowsApi;
+	this->windowsApi = pWindowsApi;
 
 	//=========================
 	// DirectInput全体の初期化
 	//=========================
-
 #pragma region DirectInput全体の初期化
 
 	// HRESULT型の変数
@@ -28,7 +27,7 @@ void Input::Initialize(WindowsApi* windowsApi) {
 
 	// DirectInputのAPIを呼び出して、全体の管理オブジェクト(システム)を作成
 	hr = DirectInput8Create(
-		 // windowsApi->GetHInstance()(アプリケーションのインスタンスハンドル)
+		// windowsApi->GetHInstance()(アプリケーションのインスタンスハンドル)
 		windowsApi->GetHInstance(),
 		// 使用するDirectInputのバージョン
 		DIRECTINPUT_VERSION,
@@ -130,7 +129,6 @@ void Input::Initialize(WindowsApi* windowsApi) {
 	assert(SUCCEEDED(hr));
 
 #pragma endregion
-
 #pragma endregion
 
 }
