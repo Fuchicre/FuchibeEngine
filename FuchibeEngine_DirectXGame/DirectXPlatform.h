@@ -3,6 +3,7 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 #include "WindowsApi.h"
+#include "FixedFps.h"
 #include <array>
 #include <string>
 #include <dxcapi.h>
@@ -164,6 +165,6 @@ private:
 	static constexpr UINT kBufferCount = 2;
 	static constexpr DXGI_FORMAT kRtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
-	// 記録時間(FPS固定用)
-	std::chrono::steady_clock::time_point mReference;
+	// FPS固定処理
+	FixedFps fixedFps;
 };
