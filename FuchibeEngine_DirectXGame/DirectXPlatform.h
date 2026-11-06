@@ -6,6 +6,7 @@
 #include <array>
 #include <string>
 #include <dxcapi.h>
+#include <chrono>
 #include "externals/DirectXTex/DirectXTex.h"
 
 class DirectXPlatform {
@@ -105,6 +106,12 @@ private:
 		uint32_t descriptorSize,
 		uint32_t index);
 
+	// FPS固定初期化関数
+	void InitializeFixFps();
+
+	// FPS固定更新関数
+	void UpdateFixFps();
+
 private:
 	// WindowsAPI
 	WindowsApi* windowsApi = nullptr;
@@ -156,4 +163,7 @@ private:
 
 	static constexpr UINT kBufferCount = 2;
 	static constexpr DXGI_FORMAT kRtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+	// 記録時間(FPS固定用)
+	std::chrono::steady_clock::time_point mReference;
 };

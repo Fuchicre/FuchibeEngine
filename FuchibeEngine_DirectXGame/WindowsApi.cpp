@@ -1,6 +1,7 @@
 #include "WindowsApi.h"
 #include "externals/imgui/imgui.h"
 #include <cassert>
+#pragma comment(lib, "winmm.lib")
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -34,6 +35,9 @@ void WindowsApi::Initialize() {
 
 	// COMの初期化
 	assert(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
+
+	// システムタイマーの分、機能を上げる
+	timeBeginPeriod(1);
 
 	//=====================
 	// ウィンドウの生成
