@@ -329,7 +329,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region RootSignatureとDescriptorRangeとRootParameterの生成
 
-// RootSignatureの生成
+	// RootSignatureの生成
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
@@ -765,9 +765,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	Audio::SoundData soundData1 = audioManager->SoundLoadWave("resources/Alarm01.wav");
 
-	//=======================
+	//=====================================================
 	// VertexResourceの生成
-	//=======================
+	//=====================================================
 
 #pragma region VertexResourceの生成
 
@@ -1366,6 +1366,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ゲームの処理
 
+		// 選択中のモデルに応じてポインタを切り替える
+		Transform* currentTransform = &planeModelTransform;
+		Material* currentMaterialData = planeModelMaterialData;
+
+		// switch文での参照ポインタ切替
+		switch (currentModelIndex) {
+		case 0:
+			currentTransform = &planeModelTransform;
+			currentMaterialData = planeModelMaterialData;
+			break;
+		case 1:
+			currentTransform = &axisModelTransform;
+			currentMaterialData = axisModelMaterialData;
+			break;
+		case 2:
+			currentTransform = &fenceModelTransform;
+			currentMaterialData = fenceModelMaterialData;
+			break;
+		}
+
 		// 開発用UIの処理。実際に開発用のUIを出す場合は、ここをゲーム固有の処理に置き換える
 #ifdef USE_IMGUI
 		ImGui::Begin("Settings");
@@ -1395,34 +1415,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 
 		//===========================================
-		// モデルのトランスフォーム操作UI
-		//===========================================
-
-		ImGui::Separator();
-		ImGui::Text("-Model Transform-");
-
-		// 各軸の回転を操作するスライダー
-		ImGui::SliderFloat3("Model Rotation", &planeModelTransform.rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
-
-		ImGui::DragFloat3("Model Scale", &planeModelTransform.scale.x, 0.1f);
-
-		// リセット時の値をY軸180度にする
-		if (ImGui::Button("Reset Rotation")) {
-			// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
-			planeModelTransform.rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
-		}
-
-		//===========================================
-		// SpriteのUV座標系を動かせる
-		//===========================================
-
-		ImGui::Separator();
-		ImGui::Text("UV Transform");
-		ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-		ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-		ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
-
-		//===========================================
 		// モデルの切り替えラジオボタン
 		//===========================================
 
@@ -1432,11 +1424,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
 		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
 
-		// 選択中のモデルに応じてポインタを切り替え
-		Transform* currentTransform = &planeModelTransform;
-		Material* currentMaterialData = planeModelMaterialData;
-
-		// switch文での参照ポインタ切替
+		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新
 		switch (currentModelIndex) {
 		case 0:
 			currentTransform = &planeModelTransform;
@@ -1453,11 +1441,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 
 		//===========================================
+		// モデルのトランスフォーム操作UI
+		//===========================================
+
+		ImGui::Separator();
+		ImGui::Text("-Model Transform-");
+
+		// 各軸の回転を操作するスライダー
+		ImGui::SliderFloat3("Model Rotation", &currentTransform->rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+
+		ImGui::DragFloat3("Model Scale", &currentTransform->scale.x, 0.1f);
+
+		// リセット時の値をY軸180度にする
+		if (ImGui::Button("Reset Rotation")) {
+			// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
+			currentTransform->rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+		}
+
+		//===========================================
+		// SpriteのUV座標系を動かせる
+		//===========================================
+
+		ImGui::Separator();
+		ImGui::Text("UV Transform");
+		ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+		ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+		ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
+
+		//===========================================
 		// 色編集用のImGui
 		//===========================================
 
 		ImGui::Separator();
-		ImGui::ColorEdit4("Color", &planeModelMaterialData->color.x);
+		ImGui::ColorEdit4("Color", &currentMaterialData->color.x);
 
 		//===========================================
 		// ライトの設定
@@ -1515,12 +1531,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ViewProjectionMatrixの計算
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
-		// インスタンス数が確保したResourceの数を超えないように注意
-		assert(kNumInstance <= kNumInstance);
+		// 描画するインスタンス数を決定(plane.objのみ10枚、他は1枚)
+		uint32_t instanceCount = (currentModelIndex == 0) ? kNumInstance : 1;
+
+		// インスタンス数が確保したResourceの数を超えないように注意する
+		assert(instanceCount <= kNumInstance);
 
 		// WVP等を計算して、Resourceに書き込む
 		for (uint32_t index = 0; index < kNumInstance; ++index) {
-			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+
+			// 操作用Transform(currentTransform)と各インスタンスのTransformを合成する
+			Vector3 scale = { transforms[index].scale.x * currentTransform->scale.x, transforms[index].scale.y * currentTransform->scale.y, transforms[index].scale.z * currentTransform->scale.z };
+			Vector3 rotate = { transforms[index].rotate.x + currentTransform->rotate.x, transforms[index].rotate.y + currentTransform->rotate.y, transforms[index].rotate.z + currentTransform->rotate.z };
+			Vector3 translate = { transforms[index].translate.x + currentTransform->translate.x, transforms[index].translate.y + currentTransform->translate.y, transforms[index].translate.z + currentTransform->translate.z };
+
+			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
 			Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(worldMatrix, viewProjectionMatrix);
 			instancingData[index].wvp = worldViewProjectionMatrix;
 			instancingData[index].world = worldMatrix;
@@ -1533,12 +1558,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		if (currentModelIndex == 0) {
 			planeModelMaterialData->uvTransform = uvTransformMatrix;
-		} else {
+		} else if (currentModelIndex == 1) {
 			axisModelMaterialData->uvTransform = uvTransformMatrix;
+		} else {
+			fenceModelMaterialData->uvTransform = uvTransformMatrix;
 		}
 
 		// 描画用の頂点数を決定
-		UINT activeVertexCount = (currentModelIndex == 0) ? UINT(planeModelData.vertices.size()) : UINT(axisModelData.vertices.size());
+		UINT activeVertexCount = 0;
+		if (currentModelIndex == 0) {
+			activeVertexCount = UINT(planeModelData.vertices.size());
+		} else if (currentModelIndex == 1) {
+			activeVertexCount = UINT(axisModelData.vertices.size());
+		} else {
+			activeVertexCount = UINT(fenceModelData.vertices.size());
+		}
 
 #pragma endregion
 
@@ -1593,8 +1627,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(3));
 		}
 
-		// 描画!6頂点の板ポリゴンを、kNumInstance(今回は10)だけInstance描画を行う
-		commandList->DrawInstanced(activeVertexCount, kNumInstance, 0, 0);
+		// plane.obj(currentModelIndex == 0)のみ10枚インスタンス描画し、他モデルは1枚描画する
+		instanceCount = (currentModelIndex == 0) ? kNumInstance : 1;
+
+		// 描画!板ポリゴンをインスタンス描画
+		commandList->DrawInstanced(activeVertexCount, instanceCount, 0, 0);
 
 		// 実際のcommandListのImGui描画コマンドを積む
 #ifdef USE_IMGUI
