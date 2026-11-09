@@ -22,6 +22,9 @@
 #include "Logger.h"
 #include "DebugCamera.h"
 #include "D3DResourceLeakChecker.h"
+#include "ParticleManager.h"
+#include <random>
+#include <memory>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
@@ -30,69 +33,10 @@
 #pragma comment(lib, "dxcompiler.lib")
 
 //=======================
-// 関数群・構造体群
+// 関数群
 //=======================
 
-#pragma region 関数群・構造体群
-
-// Vector4構造体
-struct Vector4 {
-	float x, y, z, w;
-};
-
-// Vector2構造体
-struct Vector2 {
-	float x, y;
-};
-
-// 頂点データ
-struct VertexData {
-	Vector4 position;
-	Vector2 texcoord;
-	Vector3 normal;
-};
-
-// マテリアル
-struct Material {
-	Vector4 color;
-	int32_t enableLighting;
-	float padding[3];
-	Matrix4x4 uvTransform;
-};
-
-// UVTransform用の変数
-Transform uvTransformSprite{
-	{ 1.0f, 1.0f, 1.0f },
-	{ 0.0f, 0.0f, 0.0f },
-	{ 0.0f, 0.0f, 0.0f },
-};
-
-// TransformationMatrix
-struct TransformationMatrix {
-	Matrix4x4 wvp;
-	Matrix4x4 world;
-};
-
-// 平行光源
-struct DirectionalLight {
-	// ライトの色
-	Vector4 color;
-	// ライトの向き
-	Vector3 direction;
-	// 輝度(明るさ)
-	float intensity;
-};
-
-// マテリアルデータ
-struct MaterialData {
-	std::string textureFilePath;
-};
-
-// モデルデータ
-struct ModelData {
-	std::vector<VertexData> vertices;
-	MaterialData material;
-};
+#pragma region 関数群
 
 //====================================================
 // LoadMaterialTemplateFile関数(mtlファイルを読む関数)
@@ -689,8 +633,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Depthの機能を有効化する
 	depthStencilDesc.DepthEnable = true;
 
-	// 書き込みをする
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	// Depthの書き込みを無効化する。つまり、描画はされるが奥行きバッファには書き込まれない
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
 	// 比較関数はLessEqual。つまり、近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
@@ -779,6 +723,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// plane.objモデルの読み込み
 	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
+
+	// plane.objのテクスチャを circle.png に差し替える
+	planeModelData.material.textureFilePath = "resources/circle.png";
 
 	// plane.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = dxPlatform->CreateBufferResource(sizeof(VertexData) * planeModelData.vertices.size());
@@ -941,26 +888,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
 	*(wvpData + 1) = MathUtils::MakeIdentity4x4();
 
-#pragma region Instancing用のTransformMatrixResourceの生成
-
-	// インスタンス数
-	const uint32_t kNumInstance = 10;
-
-	// インスタンスのTransformMatrixリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = dxPlatform->CreateBufferResource(sizeof(TransformationMatrix) * kNumInstance);
-
-	// 書き込むためのアドレスを取得
-	TransformationMatrix* instancingData = nullptr;
-	instancingResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
-
-	// 単位行列を書き込む
-	for (uint32_t index = 0; index < kNumInstance; index++) {
-		instancingData[index].wvp = MathUtils::MakeIdentity4x4();
-		instancingData[index].world = MathUtils::MakeIdentity4x4();
-	}
-
-#pragma endregion
-
 #pragma endregion
 
 	//===========================
@@ -969,7 +896,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexBafferViewの設定
 
-	//=======================
+	//================厅
 	// plane.objモデル
 	//=======================
 
@@ -1282,35 +1209,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//==================================================
-	// Instancing用のTransformMatrixResourceのSRVを作成
-	//==================================================
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
-
-	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	instancingSrvDesc.Buffer.FirstElement = 0;
-	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instancingSrvDesc.Buffer.NumElements = kNumInstance;
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
-
-	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxPlatform->GetSRVCPUDescriptorHandle(4);
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxPlatform->GetSRVGPUDescriptorHandle(4);
-
-	// SRVを作成(インデックス4の場所に書き込まれる)
-	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
-
 #pragma endregion
 
-	// Instancing用に最大数分のTransformを用意し、それぞれ位置が少しずつずれるように初期化する
-	Transform transforms[kNumInstance];
-	for (uint32_t index = 0; index < kNumInstance; ++index) {
-		transforms[index].scale = { 1.0f, 1.0f, 1.0f };
-		transforms[index].rotate = { 0.0f, 0.0f, 0.0f };
-		transforms[index].translate = { index * 0.1f, index * 0.1f, index * 0.1f };
-	}
+	// パーティクルマネージャーの生成と初期化(インデックス4を使用)
+	std::unique_ptr<ParticleManager> particleManager = std::make_unique<ParticleManager>();
+	particleManager->Initialize(dxPlatform, 4);
+
+	// DeltaTimeを定義する(ひとまず60fps固定)
+	const float kDeltaTime = 1.0f / 60.0f;
 
 	//================
 	// サウンドの再生
@@ -1399,6 +1305,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		const char* blendModeItems[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
 		ImGui::Combo("Blend Mode", &currentBlendMode, blendModeItems, IM_ARRAYSIZE(blendModeItems));
 
+		// ブレンドモードのリセットボタン
+		if (ImGui::Button("Reset Blend Mode")) {
+			currentBlendMode = kBlendModeNone;
+		}
+
 		//===========================================
 		// カメラ切り替え用UI
 		//===========================================
@@ -1414,6 +1325,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 		}
 
+		// 通常カメラのリセットボタン
+		if (ImGui::Button("Reset Normal Camera")) {
+			cameraTransform = { { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, -10.0f } };
+		}
+
 		//===========================================
 		// モデルの切り替えラジオボタン
 		//===========================================
@@ -1423,6 +1339,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
 		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
 		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
+
+		// モデル選択のリセットボタン
+		if (ImGui::Button("Reset Model Selection")) {
+			currentModelIndex = 0;
+		}
 
 		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新
 		switch (currentModelIndex) {
@@ -1458,6 +1379,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			currentTransform->rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
 		}
 
+		// スケールのリセットボタン
+		if (ImGui::Button("Reset Scale")) {
+			currentTransform->scale = { 1.0f, 1.0f, 1.0f };
+		}
+
+		// パーティクル更新のON/OFFチェックボックス
+		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
+
+		// 位置をリセットするボタン
+		if (ImGui::Button("Reset Particles")) {
+			particleManager->ResetParticles();
+		}
+
 		//===========================================
 		// SpriteのUV座標系を動かせる
 		//===========================================
@@ -1468,12 +1402,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 		ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
 
+		// UV Transformのリセットボタン
+		if (ImGui::Button("Reset UV Transform")) {
+			uvTransformSprite.scale = { 1.0f, 1.0f, 1.0f };
+			uvTransformSprite.rotate = { 0.0f, 0.0f, 0.0f };
+			uvTransformSprite.translate = { 0.0f, 0.0f, 0.0f };
+		}
+
 		//===========================================
 		// 色編集用のImGui
 		//===========================================
 
 		ImGui::Separator();
 		ImGui::ColorEdit4("Color", &currentMaterialData->color.x);
+
+		// マテリアルカラーのリセットボタン
+		if (ImGui::Button("Reset Color")) {
+			currentMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		}
 
 		//===========================================
 		// ライトの設定
@@ -1493,6 +1439,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 値が変わったら毎回正規化する
 			directionalLightData->direction = MathUtils::Normalize(directionalLightData->direction);
+		}
+
+		// ライト設定全体のリセットボタン
+		if (ImGui::Button("Reset Light")) {
+			directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+			directionalLightData->direction = MathUtils::Normalize({ 0.0f, -1.0f, 0.0f });
+			directionalLightData->intensity = 1.0f;
 		}
 
 		ImGui::End();
@@ -1531,25 +1484,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ViewProjectionMatrixの計算
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
-		// 描画するインスタンス数を決定(plane.objのみ10枚、他は1枚)
-		uint32_t instanceCount = (currentModelIndex == 0) ? kNumInstance : 1;
-
-		// インスタンス数が確保したResourceの数を超えないように注意する
-		assert(instanceCount <= kNumInstance);
-
-		// WVP等を計算して、Resourceに書き込む
-		for (uint32_t index = 0; index < kNumInstance; ++index) {
-
-			// 操作用Transform(currentTransform)と各インスタンスのTransformを合成する
-			Vector3 scale = { transforms[index].scale.x * currentTransform->scale.x, transforms[index].scale.y * currentTransform->scale.y, transforms[index].scale.z * currentTransform->scale.z };
-			Vector3 rotate = { transforms[index].rotate.x + currentTransform->rotate.x, transforms[index].rotate.y + currentTransform->rotate.y, transforms[index].rotate.z + currentTransform->rotate.z };
-			Vector3 translate = { transforms[index].translate.x + currentTransform->translate.x, transforms[index].translate.y + currentTransform->translate.y, transforms[index].translate.z + currentTransform->translate.z };
-
-			Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
-			Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(worldMatrix, viewProjectionMatrix);
-			instancingData[index].wvp = worldViewProjectionMatrix;
-			instancingData[index].world = worldMatrix;
-		}
+		// パーティクルの更新処理
+		particleManager->Update(viewProjectionMatrix, currentTransform, kDeltaTime);
 
 		// UVTransform行列の作成と更新
 		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
@@ -1573,8 +1509,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		} else {
 			activeVertexCount = UINT(fenceModelData.vertices.size());
 		}
-
-#pragma endregion
 
 		// ImGuiの内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -1607,7 +1541,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//==========================================
 
 		// instancing用のDataを読むためにStructuredBufferのSRVを設定する
-		commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+		commandList->SetGraphicsRootDescriptorTable(1, particleManager->GetSrvHandleGPU());
 
 		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
 		if (currentModelIndex == 0) {
@@ -1627,8 +1561,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(3));
 		}
 
-		// plane.obj(currentModelIndex == 0)のみ10枚インスタンス描画し、他モデルは1枚描画する
-		instanceCount = (currentModelIndex == 0) ? kNumInstance : 1;
+		// plane.obj(currentModelIndex == 0)のみパーティクルの生きている数をインスタンス描画し、他モデルは1枚描画する
+		uint32_t instanceCount = (currentModelIndex == 0) ? particleManager->GetNumInstance() : 1;
 
 		// 描画!板ポリゴンをインスタンス描画
 		commandList->DrawInstanced(activeVertexCount, instanceCount, 0, 0);
