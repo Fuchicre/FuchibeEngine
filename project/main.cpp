@@ -1028,9 +1028,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Transform変数の作成
 
 	// モデル用のTransformを作成する
-	Transform planeModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
-	Transform axisModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
-	Transform fenceModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform planeModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform axisModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform fenceModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
 
 #pragma endregion
 
@@ -1372,15 +1372,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Separator();
 		ImGui::Text("-Model Transform-");
 
+		// 各軸の位置を操作するドラッグUI
+		ImGui::DragFloat3("Model Position", &currentTransform->translate.x, 0.1f);
+
 		// 各軸の回転を操作するスライダー
 		ImGui::SliderFloat3("Model Rotation", &currentTransform->rotate.x, -std::numbers::pi_v<float>, std::numbers::pi_v<float>);
 
 		ImGui::DragFloat3("Model Scale", &currentTransform->scale.x, 0.1f);
 
-		// リセット時の値をY軸180度にする
+		// 位置のリセットボタン
+		if (ImGui::Button("Reset Position")) {
+			currentTransform->translate = { 0.0f, 0.0f, 0.0f };
+		}
+
+		// 回転のリセットボタン
 		if (ImGui::Button("Reset Rotation")) {
-			// 完全な0ではなく、正面を向く Y軸180度(std::numbers::pi_v<float>)にリセットする
-			currentTransform->rotate = { 0.0f, std::numbers::pi_v<float>, 0.0f };
+			currentTransform->rotate = { 0.0f, 0.0f, 0.0f };
 		}
 
 		// スケールのリセットボタン
