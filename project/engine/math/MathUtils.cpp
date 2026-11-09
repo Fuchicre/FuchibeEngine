@@ -147,22 +147,6 @@ Matrix4x4 MathUtils::MakeTranslateMatrix(const Vector3& translate) {
 }
 
 // Matrix4x4の乗算行列の作成関数
-//Matrix4x4 MathUtils::MultiplyMatrix4x4(Matrix4x4 matrix1, Matrix4x4 matrix2) {
-//
-//	Matrix4x4 result = {};
-//
-//	for (int i = 0; i < 4; ++i) {
-//		for (int j = 0; j < 4; ++j) {
-//			for (int k = 0; k < 4; ++k) {
-//				result.m[i][j] += matrix1.m[i][k] * matrix2.m[k][j];
-//			}
-//		}
-//	}
-//
-//	return result;
-//
-//}
-
 Matrix4x4 MathUtils::Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 
 	Matrix4x4 result = {};
@@ -174,15 +158,8 @@ Matrix4x4 MathUtils::Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2) {
 			}
 		}
 	}
-
 	return result;
-
 }
-
-// Vector同士の乗算行列の作成関数
-//Vector3 MathUtils::MultiplyVector(Vector3 vector1, Vector3 vector2, Vector3 vector3){
-//	
-//}
 
 // アフィン変換行列の作成関数
 Matrix4x4 MathUtils::MakeAffineMatrix(Vector3 scale, Vector3 rotateXYZ, Vector3 translate) {

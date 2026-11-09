@@ -1,0 +1,190 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{98b313c2-1600-43e4-8641-104ee584f395}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine">
+      <UniqueIdentifier>{7be8351b-1d70-4019-8770-05ce69dff544}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\utility">
+      <UniqueIdentifier>{8d4af511-c834-4e5a-89fc-04ba5b8bfa28}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\input">
+      <UniqueIdentifier>{f64d8408-efff-49ea-9e4e-acfd90491ff7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\base">
+      <UniqueIdentifier>{2dee920e-8ed7-4380-b387-f851e143519f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\audio">
+      <UniqueIdentifier>{520a269f-ac6e-4f74-8a27-65d63cca32c9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\math">
+      <UniqueIdentifier>{9b98c118-c898-437e-a7b3-6cd75cd12324}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\3d">
+      <UniqueIdentifier>{71aae946-caf7-4af0-a802-f71713a5c5bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="resources\shaders">
+      <UniqueIdentifier>{0ce42c75-22d8-4372-879e-87b2e011f51f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="application">
+      <UniqueIdentifier>{6c7b6979-6bcf-40a1-8759-388852764cb4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="externals\imgui\imgui.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_demo.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_draw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_dx12.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_win32.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_tables.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_widgets.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\3d\DebugCamera.cpp">
+      <Filter>engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\3d\ParticleManager.cpp">
+      <Filter>engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\audio\Audio.cpp">
+      <Filter>engine\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\base\D3DResourceLeakChecker.cpp">
+      <Filter>engine\base</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\base\DirectXPlatform.cpp">
+      <Filter>engine\base</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\base\FixedFps.cpp">
+      <Filter>engine\base</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\base\WindowsApi.cpp">
+      <Filter>engine\base</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\input\Input.cpp">
+      <Filter>engine\input</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\math\MathUtils.cpp">
+      <Filter>engine\math</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\math\Easing.cpp">
+      <Filter>engine\math</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\utility\Logger.cpp">
+      <Filter>engine\utility</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\utility\StringUtility.cpp">
+      <Filter>engine\utility</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>application</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="resources\shaders\Object3d.PS.hlsl">
+      <Filter>resources\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="resources\shaders\Object3d.VS.hlsl">
+      <Filter>resources\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="resources\shaders\Particle.PS.hlsl">
+      <Filter>resources\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="resources\shaders\Particle.VS.hlsl">
+      <Filter>resources\shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="externals\imgui\imconfig.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_dx12.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_win32.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_internal.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_rectpack.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_textedit.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_truetype.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\3d\DebugCamera.h">
+      <Filter>engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\3d\ParticleManager.h">
+      <Filter>engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\audio\Audio.h">
+      <Filter>engine\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\base\D3DResourceLeakChecker.h">
+      <Filter>engine\base</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\base\DirectXPlatform.h">
+      <Filter>engine\base</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\base\FixedFps.h">
+      <Filter>engine\base</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\base\WindowsApi.h">
+      <Filter>engine\base</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\input\Input.h">
+      <Filter>engine\input</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\math\Easing.h">
+      <Filter>engine\math</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\math\MathUtils.h">
+      <Filter>engine\math</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\utility\Logger.h">
+      <Filter>engine\utility</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\utility\StringUtility.h">
+      <Filter>engine\utility</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="externals\imgui\LICENSE.txt">
+      <Filter>imgui</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\shaders\Object3d.hlsli">
+      <Filter>resources\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\Particle.hlsli">
+      <Filter>resources\shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>
