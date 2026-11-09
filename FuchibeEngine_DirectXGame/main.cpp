@@ -25,6 +25,7 @@
 #include "ParticleManager.h"
 #include <random>
 #include <memory>
+#include <numbers>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
@@ -1027,9 +1028,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region Transform変数の作成
 
 	// モデル用のTransformを作成する
-	Transform planeModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, static_cast<float>(M_PI), 0.0f },{ 0.0f, 0.0f, 0.0f } };
-	Transform axisModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, static_cast<float>(M_PI), 0.0f },{ 0.0f, 0.0f, 0.0f } };
-	Transform fenceModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, static_cast<float>(M_PI), 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform planeModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform axisModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform fenceModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 0.0f, 0.0f } };
 
 #pragma endregion
 
@@ -1234,8 +1235,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region カメラのTransform変数
 
-	// カメラのTransform(Zの初期値を -10.0f に設定)
-	Transform cameraTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, -10.0f } };
+	// カメラのTransform初期値
+	Transform cameraTransform{
+		{ 1.0f, 1.0f, 1.0f },
+		{ std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f },
+		{ 0.0f, 23.0f, 10.0f }
+	};
 
 #pragma endregion
 
@@ -1327,7 +1332,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 通常カメラのリセットボタン
 		if (ImGui::Button("Reset Normal Camera")) {
-			cameraTransform = { { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, -10.0f } };
+			cameraTransform = { { 1.0f, 1.0f, 1.0f },{ std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 23.0f, 10.0f } };
 		}
 
 		//===========================================
@@ -1369,14 +1374,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Text("-Model Transform-");
 
 		// 各軸の回転を操作するスライダー
-		ImGui::SliderFloat3("Model Rotation", &currentTransform->rotate.x, -static_cast<float>(M_PI), static_cast<float>(M_PI));
+		ImGui::SliderFloat3("Model Rotation", &currentTransform->rotate.x, -std::numbers::pi_v<float>, std::numbers::pi_v<float>);
 
 		ImGui::DragFloat3("Model Scale", &currentTransform->scale.x, 0.1f);
 
 		// リセット時の値をY軸180度にする
 		if (ImGui::Button("Reset Rotation")) {
-			// 完全な0ではなく、正面を向く Y軸180度(M_PI)にリセットする
-			currentTransform->rotate = { 0.0f, static_cast<float>(M_PI), 0.0f };
+			// 完全な0ではなく、正面を向く Y軸180度(std::numbers::pi_v<float>)にリセットする
+			currentTransform->rotate = { 0.0f, std::numbers::pi_v<float>, 0.0f };
 		}
 
 		// スケールのリセットボタン
@@ -1391,6 +1396,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		if (ImGui::Button("Reset Particles")) {
 			particleManager->ResetParticles();
 		}
+
+		// BillboardのON/OFFチェックボックス
+		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
 
 		//===========================================
 		// SpriteのUV座標系を動かせる
@@ -1469,14 +1477,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ビュー行列と射影行列の宣言
 		Matrix4x4 viewMatrix;
 		Matrix4x4 projectionMatrix;
+		Matrix4x4 cameraMatrix;
 
 		if (useDebugCamera) {
 			// デバッグカメラの行列を使用
 			viewMatrix = debugCamera->GetViewMatrix();
 			projectionMatrix = debugCamera->GetProjectionMatrix();
+			// ビュー行列の逆行列からカメラ行列を取得
+			cameraMatrix = MathUtils::Inverse(viewMatrix);
 		} else {
 			// 通常カメラの行列を使用
-			Matrix4x4 cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+			cameraMatrix = MathUtils::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			viewMatrix = MathUtils::Inverse(cameraMatrix);
 			projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(WindowsApi::kClientWidth) / static_cast<float>(WindowsApi::kClientHeight), 0.1f, 100.0f);
 		}
@@ -1485,7 +1496,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
 		// パーティクルの更新処理
-		particleManager->Update(viewProjectionMatrix, currentTransform, kDeltaTime);
+		particleManager->Update(viewProjectionMatrix, cameraMatrix, currentTransform, kDeltaTime);
 
 		// UVTransform行列の作成と更新
 		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);

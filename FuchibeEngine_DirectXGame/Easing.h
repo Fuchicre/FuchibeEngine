@@ -1,5 +1,4 @@
 #pragma once
-#define _USE_MATH_DEFINES
 #include <algorithm>
 #include <cmath>
 #include "MathUtils.h"
@@ -33,7 +32,6 @@ struct State {
 };
 
 class Easing {
-
 public:
 	static float Lerp(float start, float end, float frame);
 	static Vector3 Lerp(const Vector3& start, const Vector3& end, float frame);
