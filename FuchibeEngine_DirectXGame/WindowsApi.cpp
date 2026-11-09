@@ -71,7 +71,7 @@ void WindowsApi::Initialize() {
 		// 利用するクラス名
 		wc.lpszClassName,
 		// タイトルバーの文字
-		L"FuchibeEngine",
+		L"LE2B_25_フチベ_コウキ",
 		// よく見るウィンドウスタイル
 		WS_OVERLAPPEDWINDOW,
 		// 表示するX座標(Windowsに任せる)
