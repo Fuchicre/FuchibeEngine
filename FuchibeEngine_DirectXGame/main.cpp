@@ -1139,8 +1139,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma endregion
 
 	// 初期化時のテクスチャ転送コマンドの実行とGPU完了待ち
-	dxPlatform->PreDraw();
-	dxPlatform->PostDraw();
+	dxPlatform->ExecuteCommandListAndWait();
 
 #pragma endregion
 
