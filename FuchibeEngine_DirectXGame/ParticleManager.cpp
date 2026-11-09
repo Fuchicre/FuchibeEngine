@@ -1,6 +1,7 @@
 #include "ParticleManager.h"
 #include "DirectXPlatform.h"
 #include "Easing.h"
+#include <numbers>
 
 // パーティクル生成関数
 Particle ParticleManager::MakeNewParticle() {
@@ -79,10 +80,27 @@ void ParticleManager::ResetParticles() {
 }
 
 // 更新関数
-void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Transform* currentTransform, float kDeltaTime) {
+void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform* currentTransform, float kDeltaTime) {
 
 	// 描画すべきインスタンス数
 	mNumInstance = 0;
+
+	// ビルボード行列の計算
+	Matrix4x4 billboardMatrix = MathUtils::MakeIdentity4x4();
+
+	if (mUseBillboard) {
+
+		// 裏が見えているのでくるっと反対側に回す回転行列を作成する
+		Matrix4x4 backToFrontMatrix = MathUtils::MakeRotateYMatrix(std::numbers::pi_v<float>);
+
+		// BillboardMatrixの計算
+		billboardMatrix = MathUtils::Multiply(backToFrontMatrix, cameraMatrix);
+
+		// 平行移動成分はいらない
+		billboardMatrix.m[3][0] = 0.0f;
+		billboardMatrix.m[3][1] = 0.0f;
+		billboardMatrix.m[3][2] = 0.0f;
+	}
 
 	// WVP等を計算して、Resourceに書き込む
 	for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
@@ -105,7 +123,17 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Transf
 		Vector3 rotate = { mParticles[index].transform.rotate.x + currentTransform->rotate.x, mParticles[index].transform.rotate.y + currentTransform->rotate.y, mParticles[index].transform.rotate.z + currentTransform->rotate.z };
 		Vector3 translate = { mParticles[index].transform.translate.x + currentTransform->translate.x, mParticles[index].transform.translate.y + currentTransform->translate.y, mParticles[index].transform.translate.z + currentTransform->translate.z };
 
-		Matrix4x4 worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
+		// ワールド行列の計算(useBillboardがtrueの場合は scaleMatrix * billboardMatrix * translateMatrix で計算する)
+		Matrix4x4 worldMatrix;
+
+		if (mUseBillboard) {
+			Matrix4x4 scaleMatrix = MathUtils::MakeScaleMatrix(scale);
+			Matrix4x4 translateMatrix = MathUtils::MakeTranslateMatrix(translate);
+			worldMatrix = MathUtils::Multiply(scaleMatrix, MathUtils::Multiply(billboardMatrix, translateMatrix));
+		} else {
+			worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
+		}
+
 		Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(worldMatrix, viewProjectionMatrix);
 
 		mInstancingData[mNumInstance].wvp = worldViewProjectionMatrix;

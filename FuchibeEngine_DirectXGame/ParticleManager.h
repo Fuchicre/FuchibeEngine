@@ -33,7 +33,7 @@ public:
 	void Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex);
 
 	// 更新関数
-	void Update(const Matrix4x4& viewProjectionMatrix, const Transform* currentTransform, float kDeltaTime);
+	void Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform* currentTransform, float kDeltaTime);
 
 	// パーティクル生成関数
 	Particle MakeNewParticle();
@@ -45,6 +45,8 @@ public:
 	uint32_t GetNumInstance() const { return mNumInstance; }
 	bool GetIsParticlesUpdate() const { return mIsParticlesUpdate; }
 	bool* GetIsParticlesUpdatePtr() { return &mIsParticlesUpdate; }
+	bool GetUseBillboard() const { return mUseBillboard; }
+	bool* GetUseBillboardPtr() { return &mUseBillboard; }
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU() const { return mInstancingSrvHandleGPU; }
 
 public:
@@ -70,4 +72,7 @@ private:
 
 	// パーティクルの移動更新フラグ(初期値は false = 停止中)
 	bool mIsParticlesUpdate = false;
+
+	// ビルボードを使用するかどうかのフラグ(初期値は true)
+	bool mUseBillboard = true;
 };

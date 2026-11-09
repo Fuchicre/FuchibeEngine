@@ -1,4 +1,5 @@
 #include "Easing.h"
+#include <numbers>
 
 // State構造体のメンバ関数
 void State::Initialize() {
@@ -75,7 +76,9 @@ Vector3 State::GetCurrentPosition() {
 }
 
 // それぞれのイージング関数
-float Easing::Lerp(float start, float end, float frame) { return (1.0f - frame) * start + frame * end; }
+float Easing::Lerp(float start, float end, float frame) {
+	return (1.0f - frame) * start + frame * end;
+}
 
 // Vector3の各成分を個別にLerpする
 Vector3 Easing::Lerp(const Vector3& start, const Vector3& end, float frame) {
@@ -86,11 +89,17 @@ Vector3 Easing::Lerp(const Vector3& start, const Vector3& end, float frame) {
 	return result;
 }
 
-float Easing::EaseIn(float t) { return 1.0f - cosf((t * static_cast<float>(M_PI)) / 2.0f); }
+float Easing::EaseIn(float t) {
+	return 1.0f - cosf((t * std::numbers::pi_v<float>) / 2.0f);
+}
 
-float Easing::EaseOut(float t) { return sinf((t * static_cast<float>(M_PI)) / 2.0f); }
+float Easing::EaseOut(float t) {
+	return sinf((t * std::numbers::pi_v<float>) / 2.0f);
+}
 
-float Easing::EaseInOut(float t) { return -(cosf(static_cast<float>(M_PI) * t) - 1.0f) / 2.0f; }
+float Easing::EaseInOut(float t) {
+	return -(cosf(std::numbers::pi_v<float> *t) - 1.0f) / 2.0f;
+}
 
 float Easing::EaseInBack(float t) {
 	const float c1 = 1.70158f;
