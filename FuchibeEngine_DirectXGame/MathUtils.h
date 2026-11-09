@@ -1,5 +1,8 @@
 #pragma once
 #include <cmath>
+#include <string>
+#include <vector>
+#include <cstdint>
 #define _USE_MATH_DEFINES
 
 // 4x4行列
@@ -11,10 +14,55 @@ struct Matrix3x3 {
 	float m[3][3];
 };
 
+// Vector4構造体
+struct Vector4 {
+	float x, y, z, w;
+};
+
+// Vector2構造体
+struct Vector2 {
+	float x, y;
+};
+
 struct Vector3 {
 	float x;
 	float y;
 	float z;
+
+	// + 演算子のオーバーロード
+	Vector3 operator+(const Vector3& obj) const {
+		Vector3 sc;
+		sc.x = this->x + obj.x;
+		sc.y = this->y + obj.y;
+		sc.z = this->z + obj.z;
+		return sc;
+	}
+
+	// += 演算子のオーバーロード
+	Vector3& operator+=(const Vector3& obj) {
+		x += obj.x;
+		y += obj.y;
+		z += obj.z;
+		return *this;
+	}
+
+	// - 演算子のオーバーロード
+	Vector3 operator-(const Vector3& obj) const {
+		Vector3 sc;
+		sc.x = this->x - obj.x;
+		sc.y = this->y - obj.y;
+		sc.z = this->z - obj.z;
+		return sc;
+	}
+
+	// Vector3 * float の掛け算オーバーロード
+	Vector3 operator*(float s) const {
+		Vector3 sc;
+		sc.x = this->x * s;
+		sc.y = this->y * s;
+		sc.z = this->z * s;
+		return sc;
+	}
 };
 
 struct Transform {
@@ -23,12 +71,60 @@ struct Transform {
 	Vector3 translate;
 };
 
+// 頂点データ
+struct VertexData {
+	Vector4 position;
+	Vector2 texcoord;
+	Vector3 normal;
+};
+
+// マテリアル
+struct Material {
+	Vector4 color;
+	int32_t enableLighting;
+	float padding[3];
+	Matrix4x4 uvTransform;
+};
+
+// UVTransform用の変数 (複数ファイルでincludeした際の二重定義を防ぐためinlineを指定)
+inline Transform uvTransformSprite{
+	{ 1.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 0.0f, 0.0f },
+};
+
+// TransformationMatrix
+struct TransformationMatrix {
+	Matrix4x4 wvp;
+	Matrix4x4 world;
+};
+
+// 平行光源
+struct DirectionalLight {
+	// ライトの色
+	Vector4 color;
+	// ライトの向き
+	Vector3 direction;
+	// 輝度(明るさ)
+	float intensity;
+};
+
+// マテリアルデータ
+struct MaterialData {
+	std::string textureFilePath;
+};
+
+// モデルデータ
+struct ModelData {
+	std::vector<VertexData> vertices;
+	MaterialData material;
+};
+
 struct Camera {
 	Vector3 pos;
 };
 
 class MathUtils {
-
 public:
 
 	// 拡大縮小行列

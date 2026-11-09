@@ -3,6 +3,7 @@
 struct TransformationMatrix {
     float32_t4x4 wvp;
     float32_t4x4 world;
+    float32_t4 color;
 };
 
 StructuredBuffer<TransformationMatrix> gTransformationMatrices : register(t0);
@@ -20,6 +21,7 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
     output.position = mul(input.position, gTransformationMatrices[instanceId].wvp);
     output.texcoord = input.texcoord;
     output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrices[instanceId].world));
+    output.color = gTransformationMatrices[instanceId].color;
     
     return output;
 };
