@@ -72,7 +72,7 @@ public:
 	// SoundPlayWave関数(音声を再生する関数)
 	//======================================
 
-	void SoundPlayWave(const SoundData& soundData);
+	void SoundPlayWave(SoundData& soundData);
 
 private:
 	Audio() = default;

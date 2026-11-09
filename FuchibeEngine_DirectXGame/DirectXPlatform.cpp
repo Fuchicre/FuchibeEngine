@@ -735,6 +735,52 @@ void DirectXPlatform::PostDraw() {
 #pragma endregion
 }
 
+// コマンドリストのクローズ・実行・GPUフェンス待機・リセットのみを行う関数
+void DirectXPlatform::ExecuteCommandListAndWait() {
+
+	// コマンドリストの内容を確定させる。全てのコマンドを積んでから、Closeすること
+	HRESULT hr = commandList->Close();
+	assert(SUCCEEDED(hr));
+
+	//=====================
+	// コマンドをキックする
+	//=====================
+
+#pragma region コマンドをキックする
+
+	// GPUにコマンドリストを実行させる
+	ID3D12CommandList* commandLists[] = { commandList.Get() };
+	commandQueue->ExecuteCommandLists(1, commandLists);
+
+	//=====================
+	// GPUにSignalを送る
+	//=====================
+
+	// Fenceの値を更新
+	fenceValue++;
+
+	// GPUがここまで辿り着いた時に、Fenceの値を指定した値に代入するようにSignalを送る
+	hr = commandQueue->Signal(fence.Get(), fenceValue);
+	assert(SUCCEEDED(hr));
+
+	// Fenceの値が指定したSignalの値に辿り着いているか確認する
+	if (fence->GetCompletedValue() < fenceValue) {
+
+		// 辿り着いていない場合は、Eventがシグナルされるまで待つ
+		fence->SetEventOnCompletion(fenceValue, fenceEvent);
+
+		// Eventを待つ
+		WaitForSingleObject(fenceEvent, INFINITE);
+	}
+
+	// 次フレーム用のコマンドリストを準備する
+	hr = commandAllocator->Reset();
+	assert(SUCCEEDED(hr));
+
+	hr = commandList->Reset(commandAllocator.Get(), nullptr);
+	assert(SUCCEEDED(hr));
+}
+
 // レンダーターゲットビューの初期化関数
 void DirectXPlatform::RenderTargetViewInitialize() {
 

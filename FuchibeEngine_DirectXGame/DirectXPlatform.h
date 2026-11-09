@@ -50,6 +50,9 @@ public:
 	// 描画後処理関数
 	void PostDraw();
 
+	// コマンドリストのクローズ・実行・GPUフェンス待機・リセットのみを行う関数
+	void ExecuteCommandListAndWait();
+
 private:
 	// デバイスの生成関数
 	void CreateDevice();

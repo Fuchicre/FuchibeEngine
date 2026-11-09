@@ -1,8 +1,5 @@
-[*.{cpp,h}]
-charset = utf-8
-
-# hlslとhlsliもutf-8で保存する
-[*.{cpp, h, hlsl, hlsli}]
+# cpp, h, hlsl, hlsli を utf-8 で保存する
+[*.{cpp,h,hlsl,hlsli}]
 charset = utf-8
 
 # スペルミスをintellisense上での「エラー」として扱う

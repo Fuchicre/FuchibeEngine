@@ -121,9 +121,8 @@ bool WindowsApi::ProcessMessage() {
 void WindowsApi::Finalize() {
 
 	// ウィンドウを閉じる
-	CloseWindow(hwnd);
+	DestroyWindow(hwnd);
 
 	// COMの終了処理
 	CoUninitialize();
-
 }

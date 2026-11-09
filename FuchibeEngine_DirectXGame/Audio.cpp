@@ -155,15 +155,12 @@ void Audio::SoundUnload(SoundData* soundData) {
 
 #pragma region SoundPlayWave関数(音声を再生する関数)
 
-void Audio::SoundPlayWave(const SoundData& soundData) {
+void Audio::SoundPlayWave(SoundData& soundData) {
 
 	HRESULT result;
 
-	// 多重再生や安全なインスタンス保持のため、constを外してクラス管理のポインタに割り当てる
-	SoundData& targetData = const_cast<SoundData&>(soundData);
-
 	// 波形フォーマットを元にSoundVoiceの生成
-	result = xAudio2->CreateSourceVoice(&targetData.pSourceVoice, &soundData.wfex);
+	result = xAudio2->CreateSourceVoice(&soundData.pSourceVoice, &soundData.wfex);
 	assert(SUCCEEDED(result));
 
 	// 再生する波形データの設定
@@ -173,9 +170,9 @@ void Audio::SoundPlayWave(const SoundData& soundData) {
 	buffer.Flags = XAUDIO2_END_OF_STREAM;
 
 	// 波形データの再生
-	result = targetData.pSourceVoice->SubmitSourceBuffer(&buffer);
+	result = soundData.pSourceVoice->SubmitSourceBuffer(&buffer);
 	assert(SUCCEEDED(result));
-	result = targetData.pSourceVoice->Start();
+	result = soundData.pSourceVoice->Start();
 	assert(SUCCEEDED(result));
 }
 #pragma endregion
