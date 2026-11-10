@@ -708,7 +708,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 音声データの読み込み
 	//======================
 
-	Audio::SoundData soundData1 = audioManager->SoundLoadWave("resources/Alarm01.wav");
+	Audio::SoundData soundData1 = audioManager->SoundLoadWave("resources/sound/bgm/Alarm01.wav");
 
 	//=====================================================
 	// VertexResourceの生成
@@ -723,10 +723,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region plane.objモデルとテクスチャ
 
 	// plane.objモデルの読み込み
-	ModelData planeModelData = LoadObjFile("resources", "plane.obj");
+	ModelData planeModelData = LoadObjFile("resources/plane", "plane.obj");
 
 	// plane.objのテクスチャを circle.png に差し替える
-	planeModelData.material.textureFilePath = "resources/circle.png";
+	planeModelData.material.textureFilePath = "resources/plane/circle.png";
 
 	// plane.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = dxPlatform->CreateBufferResource(sizeof(VertexData) * planeModelData.vertices.size());
@@ -739,7 +739,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region axis.objモデルとテクスチャ
 
-	ModelData axisModelData = LoadObjFile("resources", "axis.obj");
+	ModelData axisModelData = LoadObjFile("resources/axis", "axis.obj");
 	Microsoft::WRL::ComPtr<ID3D12Resource> axisModelVertexResource = dxPlatform->CreateBufferResource(sizeof(VertexData) * axisModelData.vertices.size());
 
 #pragma endregion
@@ -750,7 +750,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region fence.objモデルとテクスチャ
 
-	ModelData fenceModelData = LoadObjFile("resources", "fence.obj");
+	ModelData fenceModelData = LoadObjFile("resources/fence", "fence.obj");
 	Microsoft::WRL::ComPtr<ID3D12Resource> fenceModelVertexResource = dxPlatform->CreateBufferResource(sizeof(VertexData) * fenceModelData.vertices.size());
 
 #pragma endregion
@@ -897,7 +897,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexBafferViewの設定
 
-	//================厅
+	//================ scheduling plane.objモデル
 	// plane.objモデル
 	//=======================
 
@@ -1021,16 +1021,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//================-------
+	//=======================
 	// Transform変数の作成
-	//================-------
+	//=======================
 
 #pragma region Transform変数の作成
 
-	// モデル用のTransformを作成する
-	Transform planeModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	// 各モデル用に独立したTransformを作成する
+	Transform planeUvCheckerTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform planeCircleTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
 	Transform axisModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
 	Transform fenceModelTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+
+	// 各モデル用に独立したUvTransformを作成する
+	Transform planeUvCheckerUvTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform planeCircleUvTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform axisModelUvTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
+	Transform fenceModelUvTransform{ { 1.0f, 1.0f, 1.0f },{ 0.0f, 0.0f, 0.0f },{ 0.0f, 0.0f, 0.0f } };
 
 #pragma endregion
 
@@ -1066,6 +1073,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// リソース作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelTextureResource = dxPlatform->CreateTextureResource(planeModelMetadata);
+
+#pragma endregion
+
+	//===========================================
+	// uvChecker.pngのテクスチャを読み込む
+	//===========================================
+
+#pragma region uvChecker.png
+
+	DirectX::ScratchImage uvCheckerMipImages = DirectXPlatform::LoadTexture("resources/plane/uvChecker.png");
+	const DirectX::TexMetadata& uvCheckerMetadata = uvCheckerMipImages.GetMetadata();
+
+	// リソース作成
+	Microsoft::WRL::ComPtr<ID3D12Resource> uvCheckerTextureResource = dxPlatform->CreateTextureResource(uvCheckerMetadata);
 
 #pragma endregion
 
@@ -1113,6 +1134,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 転送関数を呼び出し、コピーコマンドをコマンドリストに積む(中間リソースが戻る)
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelIntermediateResource = dxPlatform->UploadTextureData(planeModelTextureResource, planeModelMipImages);
+
+#pragma endregion
+
+	//=================================
+	// uvChecker.pngのテクスチャを転送
+	//=================================
+
+#pragma region uvChecker.pngのテクスチャを転送
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> uvCheckerIntermediateResource = dxPlatform->UploadTextureData(uvCheckerTextureResource, uvCheckerMipImages);
 
 #pragma endregion
 
@@ -1209,6 +1240,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//===========================================
+	// uvChecker.pngのテクスチャのSRVを作成
+	//===========================================
+
+#pragma region uvChecker.pngのテクスチャのSRVを作成
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC uvCheckerSrvDesc{};
+	uvCheckerSrvDesc.Format = uvCheckerMetadata.format;
+	uvCheckerSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// 2Dテクスチャ
+	uvCheckerSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	uvCheckerSrvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
+
+	// SRVを作成(インデックス5の場所に書き込まれる)
+	device->CreateShaderResourceView(uvCheckerTextureResource.Get(), &uvCheckerSrvDesc, dxPlatform->GetSRVCPUDescriptorHandle(5));
+
+#pragma endregion
+
 #pragma endregion
 
 	//============================
@@ -1252,11 +1302,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	//============================
-	// カメラのTransform変数
-	//============================
+	//===============================
+	// メインループ前で初期化する変数群
+	//===============================
 
-#pragma region カメラのTransform変数
+#pragma region メインループ前で初期化する変数群
 
 	// カメラのTransform初期値
 	Transform cameraTransform{
@@ -1265,14 +1315,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{ 0.0f, 23.0f, 10.0f }
 	};
 
-#pragma endregion
-
-	//=======================
 	// ImGuiの切り替え用の変数
-	//=======================
-
-	// 0: plane.obj, 1: axis.obj, 2: fence.obj
+	// 0: Plane(uvChecker.png), 1: Plane(circle.png), 2: Axis(axis.obj), 3: Fence(fence.obj)
 	int currentModelIndex = 0;
+
+#pragma endregion
 
 	//=====================
 	// メインループ
@@ -1301,22 +1348,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ゲームの処理
 
 		// 選択中のモデルに応じてポインタを切り替える
-		Transform* currentTransform = &planeModelTransform;
+		Transform* currentTransform = &planeUvCheckerTransform;
 		Material* currentMaterialData = planeModelMaterialData;
+		Transform* currentUvTransform = &planeUvCheckerUvTransform;
 
 		// switch文での参照ポインタ切替
 		switch (currentModelIndex) {
 		case 0:
-			currentTransform = &planeModelTransform;
+			currentTransform = &planeUvCheckerTransform;
 			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeUvCheckerUvTransform;
 			break;
 		case 1:
-			currentTransform = &axisModelTransform;
-			currentMaterialData = axisModelMaterialData;
+			currentTransform = &planeCircleTransform;
+			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeCircleUvTransform;
 			break;
 		case 2:
+			currentTransform = &axisModelTransform;
+			currentMaterialData = axisModelMaterialData;
+			currentUvTransform = &axisModelUvTransform;
+			break;
+		case 3:
 			currentTransform = &fenceModelTransform;
 			currentMaterialData = fenceModelMaterialData;
+			currentUvTransform = &fenceModelUvTransform;
 			break;
 		}
 
@@ -1364,28 +1420,37 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		ImGui::Separator();
 		ImGui::Text("-Select Model-");
-		ImGui::RadioButton("Plane (plane.obj)", &currentModelIndex, 0);
-		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 1);
-		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 2);
+		ImGui::RadioButton("Plane (uvChecker.png)", &currentModelIndex, 0);
+		ImGui::RadioButton("Plane (circle.png)", &currentModelIndex, 1);
+		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 2);
+		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 3);
 
 		// モデル選択のリセットボタン
 		if (ImGui::Button("Reset Model Selection")) {
 			currentModelIndex = 0;
 		}
 
-		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新
+		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新する
 		switch (currentModelIndex) {
 		case 0:
-			currentTransform = &planeModelTransform;
+			currentTransform = &planeUvCheckerTransform;
 			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeUvCheckerUvTransform;
 			break;
 		case 1:
-			currentTransform = &axisModelTransform;
-			currentMaterialData = axisModelMaterialData;
+			currentTransform = &planeCircleTransform;
+			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeCircleUvTransform;
 			break;
 		case 2:
+			currentTransform = &axisModelTransform;
+			currentMaterialData = axisModelMaterialData;
+			currentUvTransform = &axisModelUvTransform;
+			break;
+		case 3:
 			currentTransform = &fenceModelTransform;
 			currentMaterialData = fenceModelMaterialData;
+			currentUvTransform = &fenceModelUvTransform;
 			break;
 		}
 
@@ -1422,6 +1487,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// パーティクル更新のON/OFFチェックボックス
 		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
 
+		// パーティクル更新フラグのリセットボタン
+		if (ImGui::Button("Reset Particles Update")) {
+			*particleManager->GetIsParticlesUpdatePtr() = false;
+		}
+
+		// 位置をリセットするボタン
+		if (ImGui::Button("Reset Particles")) {
+			particleManager->ResetParticles();
+		}
+
 		// Emitterの位置を操作するドラッグUI
 		ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
 
@@ -1439,26 +1514,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// BillboardのON/OFFチェックボックス
 		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
 
-		// 位置をリセットするボタン
-		if (ImGui::Button("Reset Particles")) {
-			particleManager->ResetParticles();
-		}
-
 		//===========================================
 		// SpriteのUV座標系を動かせる
 		//===========================================
 
 		ImGui::Separator();
 		ImGui::Text("UV Transform");
-		ImGui::DragFloat2("UV Translate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-		ImGui::DragFloat2("UV Scale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-		ImGui::SliderAngle("UV Rotate", &uvTransformSprite.rotate.z);
+		ImGui::DragFloat2("UV Translate", &currentUvTransform->translate.x, 0.01f, -10.0f, 10.0f);
+		ImGui::DragFloat2("UV Scale", &currentUvTransform->scale.x, 0.01f, -10.0f, 10.0f);
+		ImGui::SliderAngle("UV Rotate", &currentUvTransform->rotate.z);
 
 		// UV Transformのリセットボタン
 		if (ImGui::Button("Reset UV Transform")) {
-			uvTransformSprite.scale = { 1.0f, 1.0f, 1.0f };
-			uvTransformSprite.rotate = { 0.0f, 0.0f, 0.0f };
-			uvTransformSprite.translate = { 0.0f, 0.0f, 0.0f };
+			currentUvTransform->scale = { 1.0f, 1.0f, 1.0f };
+			currentUvTransform->rotate = { 0.0f, 0.0f, 0.0f };
+			currentUvTransform->translate = { 0.0f, 0.0f, 0.0f };
 		}
 
 		//===========================================
@@ -1518,7 +1588,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// === データの計算・定数バッファの更新 === //
 
-// ビュー行列と射影行列の宣言
+		// ビュー行列と射影行列の宣言
 		Matrix4x4 viewMatrix;
 		Matrix4x4 projectionMatrix;
 		Matrix4x4 cameraMatrix;
@@ -1558,13 +1628,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		particleManager->Update(viewProjectionMatrix, cameraMatrix, *currentTransform, kDeltaTime);
 
 		// UVTransform行列の作成と更新
-		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
-		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(uvTransformSprite.rotate.z));
-		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(uvTransformSprite.translate));
+		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(currentUvTransform->scale);
+		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeRotateZMatrix(currentUvTransform->rotate.z));
+		uvTransformMatrix = MathUtils::Multiply(uvTransformMatrix, MathUtils::MakeTranslateMatrix(currentUvTransform->translate));
 
-		if (currentModelIndex == 0) {
+		if (currentModelIndex == 0 || currentModelIndex == 1) {
 			planeModelMaterialData->uvTransform = uvTransformMatrix;
-		} else if (currentModelIndex == 1) {
+		} else if (currentModelIndex == 2) {
 			axisModelMaterialData->uvTransform = uvTransformMatrix;
 		} else {
 			fenceModelMaterialData->uvTransform = uvTransformMatrix;
@@ -1573,9 +1643,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 描画用の頂点数を決定
 		UINT activeVertexCount = 0;
 
-		if (currentModelIndex == 0) {
+		if (currentModelIndex == 0 || currentModelIndex == 1) {
 			activeVertexCount = UINT(planeModelData.vertices.size());
-		} else if (currentModelIndex == 1) {
+		} else if (currentModelIndex == 2) {
 			activeVertexCount = UINT(axisModelData.vertices.size());
 		} else {
 			activeVertexCount = UINT(fenceModelData.vertices.size());
@@ -1616,24 +1686,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
 		if (currentModelIndex == 0) {
-			// Plane の描画設定
+			// Plane(uvChecker.png)の描画設定
+			commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
+			commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
+			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(5));
+		} else if (currentModelIndex == 1) {
+			// Plane(circle.png)の描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(1));
-		} else if (currentModelIndex == 1) {
+		} else if (currentModelIndex == 2) {
 			// Axisの描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(2));
-		} else if (currentModelIndex == 2) {
+		} else if (currentModelIndex == 3) {
 			// Fenceの描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, fenceModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &fenceModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(3));
 		}
 
-		// plane.obj(currentModelIndex == 0)のみパーティクルの生きている数をインスタンス描画し、他モデルは1枚描画する
-		uint32_t instanceCount = (currentModelIndex == 0) ? particleManager->GetNumInstance() : 1;
+		// plane.obj(currentModelIndex == 0 または 1)のみパーティクルの生きている数をインスタンス描画し、他モデルは1枚描画する
+		uint32_t instanceCount = (currentModelIndex == 0 || currentModelIndex == 1) ? particleManager->GetNumInstance() : 1;
 
 		// 描画!板ポリゴンをインスタンス描画
 		commandList->DrawInstanced(activeVertexCount, instanceCount, 0, 0);
