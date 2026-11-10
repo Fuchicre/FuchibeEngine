@@ -3,8 +3,15 @@
 #include "Easing.h"
 #include <numbers>
 
+// AABBとPointの衝突判定関数
+bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point) {
+	return (point.x >= aabb.min.x && point.x <= aabb.max.x &&
+			point.y >= aabb.min.y && point.y <= aabb.max.y &&
+			point.z >= aabb.min.z && point.z <= aabb.max.z);
+}
+
 // パーティクル生成関数
-Particle ParticleManager::MakeNewParticle() {
+Particle ParticleManager::MakeNewParticle(const Vector3& translate) {
 
 	// 位置と速度を{-1.0f, 1.0f}でランダムに初期化する
 	std::uniform_real_distribution<float> randomDistribution(-1.0f, 1.0f);
@@ -18,7 +25,11 @@ Particle ParticleManager::MakeNewParticle() {
 	Particle particle;
 	particle.transform.scale = { 1.0f, 1.0f, 1.0f };
 	particle.transform.rotate = { 0.0f, 0.0f, 0.0f };
-	particle.transform.translate = { randomDistribution(mRandomEngine), randomDistribution(mRandomEngine), randomDistribution(mRandomEngine) };
+
+	// ランダムなオフセット位置を生成してエミッタの基準位置を加算する
+	Vector3 randomTranslate{ randomDistribution(mRandomEngine), randomDistribution(mRandomEngine), randomDistribution(mRandomEngine) };
+	particle.transform.translate = translate + randomTranslate;
+
 	particle.velocity = { randomDistribution(mRandomEngine), randomDistribution(mRandomEngine), randomDistribution(mRandomEngine) };
 	particle.color = { distColor(mRandomEngine), distColor(mRandomEngine), distColor(mRandomEngine), 1.0f };
 	particle.lifeTime = distLifeTime(mRandomEngine);
@@ -27,12 +38,30 @@ Particle ParticleManager::MakeNewParticle() {
 	return particle;
 }
 
+// Emitterでパーティクルを生成し、spliceで結合する関数
+void ParticleManager::Emit(const Emitter& emitter) {
+
+	std::list<Particle> newParticles;
+
+	for (uint32_t count = 0; count < emitter.count; ++count) {
+		newParticles.push_back(MakeNewParticle(emitter.transform.translate));
+	}
+
+	// splice関数で生成したリストを末尾に一括連結
+	particles.splice(particles.end(), newParticles);
+}
+
 // 初期化関数
 void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex) {
 
 	// 乱数生成器の初期化
 	std::random_device seedGenerator;
 	mRandomEngine.seed(seedGenerator());
+
+	// AccelerationFieldの初期設定(+x方向に 15m/s^2 の加速度、範囲は原点中心に -1m ~ 1m)
+	mAccelerationField.acceleration = { 15.0f, 0.0f, 0.0f };
+	mAccelerationField.area.min = { -1.0f, -1.0f, -1.0f };
+	mAccelerationField.area.max = { 1.0f, 1.0f, 1.0f };
 
 	// インスタンスのTransformMatrixリソースを作る
 	mInstancingResource = dxPlatform->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
@@ -68,19 +97,20 @@ void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descripto
 
 	// Instancing用に最大数分のTransformを用意し、それぞれ位置が少しずつずれるように初期化する
 	for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
-		mParticles[index] = MakeNewParticle();
+		particles.push_back(MakeNewParticle());
 	}
 }
 
 // 位置をリセットする関数
 void ParticleManager::ResetParticles() {
+	particles.clear();
 	for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
-		mParticles[index] = MakeNewParticle();
+		particles.push_back(MakeNewParticle());
 	}
 }
 
 // 更新関数
-void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform* currentTransform, float kDeltaTime) {
+void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform& currentTransform, float kDeltaTime) {
 
 	// 描画すべきインスタンス数
 	mNumInstance = 0;
@@ -103,54 +133,71 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 	}
 
 	// WVP等を計算して、Resourceに書き込む
-	for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
+	for (std::list<Particle>::iterator particleIterator = particles.begin(); particleIterator != particles.end(); ) {
 
-		// 生存時間を過ぎていたら更新せず、描画対象にしない
-		if (mParticles[index].lifeTime <= mParticles[index].currentTime) {
+		// 生存時間を過ぎていたら更新せず、描画対象にしない(生存期間が過ぎたParticleはlistから消す。戻り値が次のイテレータとなる)
+		if (particleIterator->lifeTime <= particleIterator->currentTime) {
+			particleIterator = particles.erase(particleIterator);
 			continue;
 		}
 
 		// isParticlesUpdateがtrueの時のみ移動と時間経過を行う
 		if (mIsParticlesUpdate) {
-			mParticles[index].transform.translate += mParticles[index].velocity * kDeltaTime;
+
+			// AccelerationFieldがONの場合、範囲内のParticleに加速度を適用する
+			if (mUseAccelerationField) {
+				if (IsCollision(mAccelerationField.area, particleIterator->transform.translate)) {
+					particleIterator->velocity += mAccelerationField.acceleration * kDeltaTime;
+				}
+			}
+
+			// 速度を適用
+			particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
 
 			// 経過時間を加算する
-			mParticles[index].currentTime += kDeltaTime;
+			particleIterator->currentTime += kDeltaTime;
 		}
 
-		// 操作用Transform(currentTransform)と各インスタンスのTransformを合成する
-		Vector3 scale = { mParticles[index].transform.scale.x * currentTransform->scale.x, mParticles[index].transform.scale.y * currentTransform->scale.y, mParticles[index].transform.scale.z * currentTransform->scale.z };
-		Vector3 rotate = { mParticles[index].transform.rotate.x + currentTransform->rotate.x, mParticles[index].transform.rotate.y + currentTransform->rotate.y, mParticles[index].transform.rotate.z + currentTransform->rotate.z };
-		Vector3 translate = { mParticles[index].transform.translate.x + currentTransform->translate.x, mParticles[index].transform.translate.y + currentTransform->translate.y, mParticles[index].transform.translate.z + currentTransform->translate.z };
+		// GPUのリソース上限数(kNumMaxInstance)を超えて書き込まないようにバッファオーバーラン対策
+		if (mNumInstance < kNumMaxInstance) {
 
-		// ワールド行列の計算(useBillboardがtrueの場合は scaleMatrix * billboardMatrix * translateMatrix で計算する)
-		Matrix4x4 worldMatrix;
+			// 操作用Transform(currentTransform)と各インスタンスのTransformを合成する
+			Vector3 scale = { particleIterator->transform.scale.x * currentTransform.scale.x, particleIterator->transform.scale.y * currentTransform.scale.y, particleIterator->transform.scale.z * currentTransform.scale.z };
+			Vector3 rotate = { particleIterator->transform.rotate.x + currentTransform.rotate.x, particleIterator->transform.rotate.y + currentTransform.rotate.y, particleIterator->transform.rotate.z + currentTransform.rotate.z };
+			Vector3 translate = { particleIterator->transform.translate.x + currentTransform.translate.x, particleIterator->transform.translate.y + currentTransform.translate.y, particleIterator->transform.translate.z + currentTransform.translate.z };
 
-		if (mUseBillboard) {
-			Matrix4x4 scaleMatrix = MathUtils::MakeScaleMatrix(scale);
-			Matrix4x4 translateMatrix = MathUtils::MakeTranslateMatrix(translate);
-			worldMatrix = MathUtils::Multiply(scaleMatrix, MathUtils::Multiply(billboardMatrix, translateMatrix));
-		} else {
-			worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
+			// ワールド行列の計算(useBillboardがtrueの場合は scaleMatrix * billboardMatrix * translateMatrix で計算する)
+			Matrix4x4 worldMatrix;
+
+			if (mUseBillboard) {
+				Matrix4x4 scaleMatrix = MathUtils::MakeScaleMatrix(scale);
+				Matrix4x4 translateMatrix = MathUtils::MakeTranslateMatrix(translate);
+				worldMatrix = MathUtils::Multiply(scaleMatrix, MathUtils::Multiply(billboardMatrix, translateMatrix));
+			} else {
+				worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
+			}
+
+			Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(worldMatrix, viewProjectionMatrix);
+
+			mInstancingData[mNumInstance].wvp = worldViewProjectionMatrix;
+			mInstancingData[mNumInstance].world = worldMatrix;
+			mInstancingData[mNumInstance].color = particleIterator->color;
+
+			// 経過時間の進行度割合(0.0f ~ 1.0f)を計算
+			float t = particleIterator->currentTime / particleIterator->lifeTime;
+
+			// 徐々に透明化させるためにイージングを適用する
+			// EaseInQuartの場合、消え際に向かって急速に透明化していく
+			float alpha = 1.0f - Easing::EaseInQuart(t);
+
+			// 算出したアルファ値をinstancingDataに書き込む
+			mInstancingData[mNumInstance].color.w = alpha;
+
+			// 生きているパーティクルの数を1つカウントする
+			++mNumInstance;
 		}
 
-		Matrix4x4 worldViewProjectionMatrix = MathUtils::Multiply(worldMatrix, viewProjectionMatrix);
-
-		mInstancingData[mNumInstance].wvp = worldViewProjectionMatrix;
-		mInstancingData[mNumInstance].world = worldMatrix;
-		mInstancingData[mNumInstance].color = mParticles[index].color;
-
-		// 経過時間の進行度割合(0.0f ~ 1.0f)を計算
-		float t = mParticles[index].currentTime / mParticles[index].lifeTime;
-
-		// 徐々に透明化させるためにイージングを適用する
-		// EaseInQuartの場合、消え際に向かって急速に透明化していく
-		float alpha = 1.0f - Easing::EaseInQuart(t);
-
-		// 算出したアルファ値をinstancingDataに書き込む
-		mInstancingData[mNumInstance].color.w = alpha;
-
-		// 生きているパーティクルの数を1つカウントする
-		++mNumInstance;
+		// 次のパーティクルに進める
+		++particleIterator;
 	}
 }

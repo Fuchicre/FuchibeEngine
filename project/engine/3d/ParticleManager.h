@@ -3,6 +3,7 @@
 #include <wrl/client.h>
 #include <random>
 #include <cstdint>
+#include <list>
 #include "MathUtils.h"
 
 // 前方宣言
@@ -26,20 +27,49 @@ struct ParticleForGPU {
 	Vector4 color;
 };
 
+// エミッタ構造体
+struct Emitter {
+	// エミッタのTransform
+	Transform transform;
+	// 発生数
+	uint32_t count;
+	// 発生頻度
+	float frequency;
+	// 頻度用時刻
+	float frequencyTime;
+};
+
+// 風を表現するField
+struct AccelerationField {
+	// 加速度
+	Vector3 acceleration;
+	// 範囲
+	AABB area;
+};
+
 class ParticleManager {
 public:
+
+	// AABBとPointの衝突判定関数
+	bool IsCollision(const AABB& aabb, const Vector3& point);
+
+	// パーティクル生成関数
+	Particle MakeNewParticle(const Vector3& translate = { 0.0f, 0.0f, 0.0f });
+
+	// Emitterでパーティクルを生成して内部リストに追加する関数
+	void Emit(const Emitter& emitter);
 
 	// 初期化関数
 	void Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex);
 
 	// 更新関数
-	void Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform* currentTransform, float kDeltaTime);
-
-	// パーティクル生成関数
-	Particle MakeNewParticle();
+	void Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform& currentTransform, float kDeltaTime);
 
 	// 位置をリセットする関数
 	void ResetParticles();
+
+	// パーティクルを1個追加する関数
+	void AddParticle(const Particle& particle) { particles.push_back(particle); }
 
 	// ゲッター・セッター
 	uint32_t GetNumInstance() const { return mNumInstance; }
@@ -47,18 +77,24 @@ public:
 	bool* GetIsParticlesUpdatePtr() { return &mIsParticlesUpdate; }
 	bool GetUseBillboard() const { return mUseBillboard; }
 	bool* GetUseBillboardPtr() { return &mUseBillboard; }
+
+	// AccelerationFieldのゲッター・セッター
+	bool GetUseAccelerationField() const { return mUseAccelerationField; }
+	bool* GetUseAccelerationFieldPtr() { return &mUseAccelerationField; }
+	AccelerationField& GetAccelerationField() { return mAccelerationField; }
+
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU() const { return mInstancingSrvHandleGPU; }
 
 public:
-	// インスタンス数
-	static const uint32_t kNumMaxInstance = 10;
+	// インスタンス最大数
+	static const uint32_t kNumMaxInstance = 100;
 
 private:
 	// 乱数生成器
 	std::mt19937 mRandomEngine;
 
-	// Instancing用に最大数分のTransformを用意する配列
-	Particle mParticles[kNumMaxInstance]{};
+	// インスタンスのリスト
+	std::list<Particle> particles;
 
 	// インスタンスのTransformMatrixリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> mInstancingResource;
@@ -75,4 +111,10 @@ private:
 
 	// ビルボードを使用するかどうかのフラグ(初期値は true)
 	bool mUseBillboard = true;
+
+	// AccelerationField(風/加速度)を使用するかどうかのフラグ(初期値は false = オフ)
+	bool mUseAccelerationField = false;
+
+	// AccelerationFieldのインスタンス
+	AccelerationField mAccelerationField{};
 };

@@ -64,6 +64,12 @@ struct Vector3 {
 	}
 };
 
+// AABB構造体
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+
 struct Transform {
 	Vector3 scale;
 	Vector3 rotate;
