@@ -1211,12 +1211,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//============================
+	// パーティクル関係の初期化
+	//============================
+
+#pragma region パーティクル関係の初期化
+
 	// パーティクルマネージャーの生成と初期化(インデックス4を使用)
 	std::unique_ptr<ParticleManager> particleManager = std::make_unique<ParticleManager>();
 	particleManager->Initialize(dxPlatform, 4);
 
+	// Emitterの初期化
+	Emitter emitter{};
+
+	// 1回につき3個発生
+	emitter.count = 3;
+
+	// 0.5秒ごとに発生
+	emitter.frequency = 0.5f;
+
+	// 頻度用時刻の初期化
+	emitter.frequencyTime = 0.0f;
+
+	emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
+	emitter.transform.rotate = { 0.0f, 0.0f, 0.0f };
+	emitter.transform.scale = { 1.0f, 1.0f, 1.0f };
+
 	// DeltaTimeを定義する(ひとまず60fps固定)
 	const float kDeltaTime = 1.0f / 60.0f;
+
+#pragma endregion
 
 	//================
 	// サウンドの再生
@@ -1398,13 +1422,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// パーティクル更新のON/OFFチェックボックス
 		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
 
-		// 位置をリセットするボタン
-		if (ImGui::Button("Reset Particles")) {
-			particleManager->ResetParticles();
+		// Emitterの位置を操作するドラッグUI
+		ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
+
+		// Emitterの位置・時間の倍率をリセットするボタン
+		if (ImGui::Button("Reset Emitter")) {
+			emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
+			emitter.frequencyTime = 0.0f;
+		}
+
+		// Particleを3個追加で生成するボタン
+		if (ImGui::Button("Add Particles")) {
+			particleManager->Emit(emitter);
 		}
 
 		// BillboardのON/OFFチェックボックス
 		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
+
+		// 位置をリセットするボタン
+		if (ImGui::Button("Reset Particles")) {
+			particleManager->ResetParticles();
+		}
 
 		//===========================================
 		// SpriteのUV座標系を動かせる
@@ -1480,7 +1518,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// === データの計算・定数バッファの更新 === //
 
-		// ビュー行列と射影行列の宣言
+// ビュー行列と射影行列の宣言
 		Matrix4x4 viewMatrix;
 		Matrix4x4 projectionMatrix;
 		Matrix4x4 cameraMatrix;
@@ -1501,8 +1539,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ViewProjectionMatrixの計算
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
+		// Emitterの自動発生更新処理
+		if (particleManager->GetIsParticlesUpdate()) {
+
+			// 時刻を進める
+			emitter.frequencyTime += kDeltaTime;
+
+			// 頻度を超えたら発生
+			if (emitter.frequency <= emitter.frequencyTime) {
+				// 発生処理
+				particleManager->Emit(emitter);
+				// 余計に過ぎた時間も加味して頻度計算をする
+				emitter.frequencyTime -= emitter.frequency;
+			}
+		}
+
 		// パーティクルの更新処理
-		particleManager->Update(viewProjectionMatrix, cameraMatrix, currentTransform, kDeltaTime);
+		particleManager->Update(viewProjectionMatrix, cameraMatrix, *currentTransform, kDeltaTime);
 
 		// UVTransform行列の作成と更新
 		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(uvTransformSprite.scale);
@@ -1519,6 +1572,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 描画用の頂点数を決定
 		UINT activeVertexCount = 0;
+
 		if (currentModelIndex == 0) {
 			activeVertexCount = UINT(planeModelData.vertices.size());
 		} else if (currentModelIndex == 1) {
