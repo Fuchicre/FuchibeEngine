@@ -3,6 +3,13 @@
 #include "Easing.h"
 #include <numbers>
 
+// AABBとPointの衝突判定関数
+bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point) {
+	return (point.x >= aabb.min.x && point.x <= aabb.max.x &&
+			point.y >= aabb.min.y && point.y <= aabb.max.y &&
+			point.z >= aabb.min.z && point.z <= aabb.max.z);
+}
+
 // パーティクル生成関数
 Particle ParticleManager::MakeNewParticle(const Vector3& translate) {
 
@@ -50,6 +57,11 @@ void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descripto
 	// 乱数生成器の初期化
 	std::random_device seedGenerator;
 	mRandomEngine.seed(seedGenerator());
+
+	// AccelerationFieldの初期設定(+x方向に 15m/s^2 の加速度、範囲は原点中心に -1m ~ 1m)
+	mAccelerationField.acceleration = { 15.0f, 0.0f, 0.0f };
+	mAccelerationField.area.min = { -1.0f, -1.0f, -1.0f };
+	mAccelerationField.area.max = { 1.0f, 1.0f, 1.0f };
 
 	// インスタンスのTransformMatrixリソースを作る
 	mInstancingResource = dxPlatform->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
@@ -131,6 +143,15 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 
 		// isParticlesUpdateがtrueの時のみ移動と時間経過を行う
 		if (mIsParticlesUpdate) {
+
+			// AccelerationFieldがONの場合、範囲内のParticleに加速度を適用する
+			if (mUseAccelerationField) {
+				if (IsCollision(mAccelerationField.area, particleIterator->transform.translate)) {
+					particleIterator->velocity += mAccelerationField.acceleration * kDeltaTime;
+				}
+			}
+
+			// 速度を適用
 			particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
 
 			// 経過時間を加算する

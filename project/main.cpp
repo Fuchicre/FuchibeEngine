@@ -1487,6 +1487,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// パーティクル更新のON/OFFチェックボックス
 		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
 
+		// AccelerationField(風)のON/OFFチェックボックス
+		ImGui::Checkbox("Use AccelerationField", particleManager->GetUseAccelerationFieldPtr());
+
 		// パーティクル更新フラグのリセットボタン
 		if (ImGui::Button("Reset Particles Update")) {
 			*particleManager->GetIsParticlesUpdatePtr() = false;

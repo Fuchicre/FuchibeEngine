@@ -39,20 +39,31 @@ struct Emitter {
 	float frequencyTime;
 };
 
+// 風を表現するField
+struct AccelerationField {
+	// 加速度
+	Vector3 acceleration;
+	// 範囲
+	AABB area;
+};
+
 class ParticleManager {
 public:
 
-	// 初期化関数
-	void Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex);
-
-	// 更新関数
-	void Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform& currentTransform, float kDeltaTime);
+	// AABBとPointの衝突判定関数
+	bool IsCollision(const AABB& aabb, const Vector3& point);
 
 	// パーティクル生成関数
 	Particle MakeNewParticle(const Vector3& translate = { 0.0f, 0.0f, 0.0f });
 
 	// Emitterでパーティクルを生成して内部リストに追加する関数
 	void Emit(const Emitter& emitter);
+
+	// 初期化関数
+	void Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex);
+
+	// 更新関数
+	void Update(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& cameraMatrix, const Transform& currentTransform, float kDeltaTime);
 
 	// 位置をリセットする関数
 	void ResetParticles();
@@ -66,6 +77,12 @@ public:
 	bool* GetIsParticlesUpdatePtr() { return &mIsParticlesUpdate; }
 	bool GetUseBillboard() const { return mUseBillboard; }
 	bool* GetUseBillboardPtr() { return &mUseBillboard; }
+
+	// AccelerationFieldのゲッター・セッター
+	bool GetUseAccelerationField() const { return mUseAccelerationField; }
+	bool* GetUseAccelerationFieldPtr() { return &mUseAccelerationField; }
+	AccelerationField& GetAccelerationField() { return mAccelerationField; }
+
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU() const { return mInstancingSrvHandleGPU; }
 
 public:
@@ -94,4 +111,10 @@ private:
 
 	// ビルボードを使用するかどうかのフラグ(初期値は true)
 	bool mUseBillboard = true;
+
+	// AccelerationField(風/加速度)を使用するかどうかのフラグ(初期値は false = オフ)
+	bool mUseAccelerationField = false;
+
+	// AccelerationFieldのインスタンス
+	AccelerationField mAccelerationField{};
 };
