@@ -84,9 +84,9 @@ MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const st
 
 #pragma endregion
 
-//=======================================
+//================================-------
 // LoadObjFile関数(Objファイルを読む関数)
-//=======================================
+//================================-------
 
 #pragma region LoadObjFile関数(Objファイルを読む関数)
 
@@ -725,8 +725,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// plane.objモデルの読み込み
 	ModelData planeModelData = LoadObjFile("resources/plane", "plane.obj");
 
-	// plane.objのテクスチャを circle.png に差し替える
-	planeModelData.material.textureFilePath = "resources/plane/circle.png";
+	// plane.objのテクスチャを triangle.png に差し替える
+	planeModelData.material.textureFilePath = "resources/plane/triangle.png";
 
 	// plane.objモデルの頂点リソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> planeModelVertexResource = dxPlatform->CreateBufferResource(sizeof(VertexData) * planeModelData.vertices.size());
@@ -897,7 +897,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexBafferViewの設定
 
-	//================ scheduling plane.objモデル
+	//=======================
 	// plane.objモデル
 	//=======================
 
@@ -1316,7 +1316,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	};
 
 	// ImGuiの切り替え用の変数
-	// 0: Plane(uvChecker.png), 1: Plane(circle.png), 2: Axis(axis.obj), 3: Fence(fence.obj)
+	// 0: Plane(uvChecker.png), 1: Plane(triangle.png), 2: Axis(axis.obj), 3: Fence(fence.obj)
 	int currentModelIndex = 0;
 
 #pragma endregion
@@ -1347,6 +1347,57 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ゲームの処理
 
+		//===========================================
+		// ホットリロード監視・パラメータ自動読み込み処理
+		//===========================================
+
+#pragma region ホットリロード監視・パラメータ自動読み込み処理
+
+		static bool useHotReload = true;
+		static const std::string kHotReloadFilePath = "emitEnergyShowerEffectConfig.txt";
+		static std::filesystem::file_time_type lastConfigWriteTime{};
+		static bool isHotReloadInitialized = false;
+
+		// ホットリロード対象パラメータ
+		static Vector3 energyShowerCenterPos = { 0.0f, 6.0f, 0.0f };
+		static uint32_t energyShowerCount = 24;
+		static float energyShowerAttackInterval = 3.0f;
+
+		if (useHotReload) {
+			std::error_code ec;
+			// 初回起動時に設定ファイルが存在しなければデフォルト値で自動生成する
+			if (!std::filesystem::exists(kHotReloadFilePath, ec)) {
+				std::ofstream outFile(kHotReloadFilePath);
+				if (outFile.is_open()) {
+					outFile << energyShowerCenterPos.x << " " << energyShowerCenterPos.y << " " << energyShowerCenterPos.z << "\n";
+					outFile << energyShowerCount << "\n";
+					outFile << energyShowerAttackInterval << "\n";
+				}
+			}
+
+			// ファイルの更新日時を取得して変更があれば即時リロードする
+			auto currentWriteTime = std::filesystem::last_write_time(kHotReloadFilePath, ec);
+			if (!ec && (!isHotReloadInitialized || currentWriteTime != lastConfigWriteTime)) {
+				std::ifstream inFile(kHotReloadFilePath);
+				if (inFile.is_open()) {
+					inFile >> energyShowerCenterPos.x >> energyShowerCenterPos.y >> energyShowerCenterPos.z;
+					inFile >> energyShowerCount;
+					inFile >> energyShowerAttackInterval;
+
+					lastConfigWriteTime = currentWriteTime;
+
+					// 初回読み込み以降にファイルが保存された場合、現在選択中のモデル演出へ即時反映する
+					if (isHotReloadInitialized && currentModelIndex == 1) {
+						particleManager->EmitEnergyShower(energyShowerCenterPos, energyShowerCount);
+						emitter.frequencyTime = 0.0f;
+					}
+					isHotReloadInitialized = true;
+				}
+			}
+		}
+
+#pragma endregion
+
 		// 選択中のモデルに応じてポインタを切り替える
 		Transform* currentTransform = &planeUvCheckerTransform;
 		Material* currentMaterialData = planeModelMaterialData;
@@ -1364,21 +1415,93 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			currentMaterialData = planeModelMaterialData;
 			currentUvTransform = &planeCircleUvTransform;
 			break;
-		case 2:
-			currentTransform = &axisModelTransform;
-			currentMaterialData = axisModelMaterialData;
-			currentUvTransform = &axisModelUvTransform;
-			break;
-		case 3:
-			currentTransform = &fenceModelTransform;
-			currentMaterialData = fenceModelMaterialData;
-			currentUvTransform = &fenceModelUvTransform;
-			break;
+			/*
+			case 2:
+				currentTransform = &axisModelTransform;
+				currentMaterialData = axisModelMaterialData;
+				currentUvTransform = &axisModelUvTransform;
+				break;
+			case 3:
+				currentTransform = &fenceModelTransform;
+				currentMaterialData = fenceModelMaterialData;
+				currentUvTransform = &fenceModelUvTransform;
+				break;
+			*/
 		}
 
 		// 開発用UIの処理。実際に開発用のUIを出す場合は、ここをゲーム固有の処理に置き換える
 #ifdef USE_IMGUI
 		ImGui::Begin("Settings");
+
+		//===========================================
+		// ホットリロード設定用UI
+		//===========================================
+
+		ImGui::Separator();
+		ImGui::Text("-Hot Reload-");
+		ImGui::Checkbox("Enable Hot Reload", &useHotReload);
+		ImGui::Text("Target File: %s", kHotReloadFilePath.c_str());
+
+		//===========================================
+		// 演出の切り替えラジオボタン
+		//===========================================
+
+		int prevModelIndex = currentModelIndex;
+
+		ImGui::Separator();
+		ImGui::Text("-Select Effect-");
+		ImGui::RadioButton("Plane (uvChecker.png)", &currentModelIndex, 0);
+		ImGui::RadioButton("EnergyShower Effect (triangle.png)", &currentModelIndex, 1);
+		/*
+		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 2);
+		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 3);
+
+		// モデル選択のリセットボタン
+		if (ImGui::Button("Reset Model Selection")) {
+			currentModelIndex = 0;
+		}
+		*/
+
+		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新する
+		switch (currentModelIndex) {
+		case 0:
+			currentTransform = &planeUvCheckerTransform;
+			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeUvCheckerUvTransform;
+			break;
+		case 1:
+			currentTransform = &planeCircleTransform;
+			currentMaterialData = planeModelMaterialData;
+			currentUvTransform = &planeCircleUvTransform;
+			break;
+			/*
+			case 2:
+				currentTransform = &axisModelTransform;
+				currentMaterialData = axisModelMaterialData;
+				currentUvTransform = &axisModelUvTransform;
+				break;
+			case 3:
+				currentTransform = &fenceModelTransform;
+				currentMaterialData = fenceModelMaterialData;
+				currentUvTransform = &fenceModelUvTransform;
+				break;
+			*/
+		}
+
+		// モデル切り替え時の演出統合処理
+		if (prevModelIndex != currentModelIndex) {
+			if (currentModelIndex == 1) {
+				// モデルを切り替えるだけでエナジーシャワー風演出を画面中央から即座に開始する
+				particleManager->EmitEnergyShower(energyShowerCenterPos, energyShowerCount);
+				// 自動更新ON
+				*particleManager->GetIsParticlesUpdatePtr() = true;
+				emitter.frequencyTime = 0.0f;
+			} else if (currentModelIndex == 0) {
+				// 通常モデルに戻した際はパーティクルをリセットする
+				particleManager->ResetParticles();
+				emitter.frequencyTime = 0.0f;
+			}
+		}
 
 		//===========================================
 		// ブレンドモード切り替え用UI
@@ -1395,64 +1518,43 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 
 		//===========================================
-		// カメラ切り替え用UI
+		// エナジーシャワー風演出&パーティクル制御UI
 		//===========================================
 
 		ImGui::Separator();
-		ImGui::Text("- Camera -");
-		ImGui::Checkbox("Use Debug Camera", &useDebugCamera);
 
-		// デバッグカメラのリセットボタン
-		if (useDebugCamera) {
-			if (ImGui::Button("Reset Debug Camera")) {
-				debugCamera->Reset();
+		// パーティクル更新のON/OFFチェックボックス
+		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
+
+		// AccelerationField(風)のON/OFFチェックボックス
+		ImGui::Checkbox("Use AccelerationField", particleManager->GetUseAccelerationFieldPtr());
+
+		// パーティクル更新フラグのリセットボタン
+		if (ImGui::Button("Reset Particles Update")) {
+			*particleManager->GetIsParticlesUpdatePtr() = false;
+		}
+
+		// 位置をリセットするボタン
+		if (ImGui::Button("Reset Particles")) {
+			if (currentModelIndex == 1) {
+				particleManager->EmitEnergyShower(energyShowerCenterPos, energyShowerCount);
+				emitter.frequencyTime = 0.0f;
+			} else {
+				particleManager->ResetParticles();
 			}
 		}
 
-		// 通常カメラのリセットボタン
-		if (ImGui::Button("Reset Normal Camera")) {
-			cameraTransform = { { 1.0f, 1.0f, 1.0f },{ std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 23.0f, 10.0f } };
+		// Emitterの位置を操作するドラッグUI
+		ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
+
+		// Emitterの位置・時間の倍率をリセットするボタン
+		if (ImGui::Button("Reset Emitter")) {
+			emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
+			emitter.frequencyTime = 0.0f;
 		}
 
-		//===========================================
-		// モデルの切り替えラジオボタン
-		//===========================================
-
-		ImGui::Separator();
-		ImGui::Text("-Select Model-");
-		ImGui::RadioButton("Plane (uvChecker.png)", &currentModelIndex, 0);
-		ImGui::RadioButton("Plane (circle.png)", &currentModelIndex, 1);
-		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 2);
-		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 3);
-
-		// モデル選択のリセットボタン
-		if (ImGui::Button("Reset Model Selection")) {
-			currentModelIndex = 0;
-		}
-
-		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新する
-		switch (currentModelIndex) {
-		case 0:
-			currentTransform = &planeUvCheckerTransform;
-			currentMaterialData = planeModelMaterialData;
-			currentUvTransform = &planeUvCheckerUvTransform;
-			break;
-		case 1:
-			currentTransform = &planeCircleTransform;
-			currentMaterialData = planeModelMaterialData;
-			currentUvTransform = &planeCircleUvTransform;
-			break;
-		case 2:
-			currentTransform = &axisModelTransform;
-			currentMaterialData = axisModelMaterialData;
-			currentUvTransform = &axisModelUvTransform;
-			break;
-		case 3:
-			currentTransform = &fenceModelTransform;
-			currentMaterialData = fenceModelMaterialData;
-			currentUvTransform = &fenceModelUvTransform;
-			break;
-		}
+		// BillboardのON/OFFチェックボックス
+		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
 
 		//===========================================
 		// モデルのトランスフォーム操作UI
@@ -1484,45 +1586,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			currentTransform->scale = { 1.0f, 1.0f, 1.0f };
 		}
 
-		// パーティクル更新のON/OFFチェックボックス
-		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
-
-		// AccelerationField(風)のON/OFFチェックボックス
-		ImGui::Checkbox("Use AccelerationField", particleManager->GetUseAccelerationFieldPtr());
-
-		// パーティクル更新フラグのリセットボタン
-		if (ImGui::Button("Reset Particles Update")) {
-			*particleManager->GetIsParticlesUpdatePtr() = false;
-		}
-
-		// 位置をリセットするボタン
-		if (ImGui::Button("Reset Particles")) {
-			particleManager->ResetParticles();
-		}
-
-		// Emitterの位置を操作するドラッグUI
-		ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
-
-		// Emitterの位置・時間の倍率をリセットするボタン
-		if (ImGui::Button("Reset Emitter")) {
-			emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
-			emitter.frequencyTime = 0.0f;
-		}
-
-		// Particleを3個追加で生成するボタン
-		if (ImGui::Button("Add Particles")) {
-			particleManager->Emit(emitter);
-		}
-
-		// BillboardのON/OFFチェックボックス
-		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
-
 		//===========================================
 		// SpriteのUV座標系を動かせる
 		//===========================================
 
 		ImGui::Separator();
-		ImGui::Text("UV Transform");
+		ImGui::Text("-UV Transform-");
 		ImGui::DragFloat2("UV Translate", &currentUvTransform->translate.x, 0.01f, -10.0f, 10.0f);
 		ImGui::DragFloat2("UV Scale", &currentUvTransform->scale.x, 0.01f, -10.0f, 10.0f);
 		ImGui::SliderAngle("UV Rotate", &currentUvTransform->rotate.z);
@@ -1539,7 +1608,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================================
 
 		ImGui::Separator();
-		ImGui::ColorEdit4("Color", &currentMaterialData->color.x);
+		ImGui::ColorEdit4("-Color-", &currentMaterialData->color.x);
 
 		// マテリアルカラーのリセットボタン
 		if (ImGui::Button("Reset Color")) {
@@ -1551,7 +1620,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//===========================================
 
 		ImGui::Separator();
-		ImGui::Text("Directional Light");
+		ImGui::Text("-Directional Light-");
 
 		// ライトの色変更
 		ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
@@ -1612,18 +1681,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ViewProjectionMatrixの計算
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
-		// Emitterの自動発生更新処理
-		if (particleManager->GetIsParticlesUpdate()) {
-
-			// 時刻を進める
-			emitter.frequencyTime += kDeltaTime;
-
-			// 頻度を超えたら発生
-			if (emitter.frequency <= emitter.frequencyTime) {
-				// 発生処理
-				particleManager->Emit(emitter);
-				// 余計に過ぎた時間も加味して頻度計算をする
-				emitter.frequencyTime -= emitter.frequency;
+		if (currentModelIndex == 0) {
+			// Emitterの自動発生更新処理(uvChecker.png用のパーティクルの挙動)
+			if (particleManager->GetIsParticlesUpdate()) {
+				// 時刻を進める
+				emitter.frequencyTime += kDeltaTime;
+				// 頻度を超えたら発生
+				if (emitter.frequency <= emitter.frequencyTime) {
+					// 発生処理
+					particleManager->Emit(emitter);
+					// 余計に過ぎた時間も加味して頻度計算をする
+					emitter.frequencyTime -= emitter.frequency;
+				}
+			}
+		} else if (currentModelIndex == 1) {
+			// エナジーシャワー風演出の自動発生処理
+			if (particleManager->GetIsParticlesUpdate()) {
+				// 時刻を進める
+				emitter.frequencyTime += kDeltaTime;
+				// エナジーシャワーは演出時間が長いため指定間隔おきに技を発動する
+				if (energyShowerAttackInterval <= emitter.frequencyTime) {
+					// カメラ視界中央にエナジーシャワーを一括生成する
+					particleManager->EmitEnergyShower(energyShowerCenterPos, energyShowerCount);
+					emitter.frequencyTime = 0.0f;
+				}
 			}
 		}
 
@@ -1687,18 +1768,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// instancing用のDataを読むためにStructuredBufferのSRVを設定する
 		commandList->SetGraphicsRootDescriptorTable(1, particleManager->GetSrvHandleGPU());
 
-		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
+		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える (plane.objの2種のみ有効化)
 		if (currentModelIndex == 0) {
 			// Plane(uvChecker.png)の描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(5));
 		} else if (currentModelIndex == 1) {
-			// Plane(circle.png)の描画設定
+			// Plane(triangle.png)の描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, planeModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &planeModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(1));
-		} else if (currentModelIndex == 2) {
+		}
+		/*
+		else if (currentModelIndex == 2) {
 			// Axisの描画設定
 			commandList->SetGraphicsRootConstantBufferView(0, axisModelMaterialResource.Get()->GetGPUVirtualAddress());
 			commandList->IASetVertexBuffers(0, 1, &axisModelVertexBufferView);
@@ -1709,6 +1792,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->IASetVertexBuffers(0, 1, &fenceModelVertexBufferView);
 			commandList->SetGraphicsRootDescriptorTable(2, dxPlatform->GetSRVGPUDescriptorHandle(3));
 		}
+		*/
 
 		// plane.obj(currentModelIndex == 0 または 1)のみパーティクルの生きている数をインスタンス描画し、他モデルは1枚描画する
 		uint32_t instanceCount = (currentModelIndex == 0 || currentModelIndex == 1) ? particleManager->GetNumInstance() : 1;

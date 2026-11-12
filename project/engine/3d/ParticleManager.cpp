@@ -2,6 +2,8 @@
 #include "DirectXPlatform.h"
 #include "Easing.h"
 #include <numbers>
+#include <cmath>
+#include <algorithm>
 
 // AABBとPointの衝突判定関数
 bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point) {
@@ -34,6 +36,7 @@ Particle ParticleManager::MakeNewParticle(const Vector3& translate) {
 	particle.color = { distColor(mRandomEngine), distColor(mRandomEngine), distColor(mRandomEngine), 1.0f };
 	particle.lifeTime = distLifeTime(mRandomEngine);
 	particle.currentTime = 0.0f;
+	particle.isEnergyShower = false;
 
 	return particle;
 }
@@ -51,6 +54,54 @@ void ParticleManager::Emit(const Emitter& emitter) {
 	particles.splice(particles.end(), newParticles);
 }
 
+// エナジーシャワー風演出の生成関数
+void ParticleManager::EmitEnergyShower(const Vector3& centerPos, uint32_t count) {
+
+	// エナジーシャワー発射時のみ画面上の旧パーティクルを消去する
+	particles.clear();
+
+	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+
+	// 奥で広がる円の半径(数値を小さくすると三角形同士の間隔が狭まる)
+	float radius = 2.8f;
+
+	for (uint32_t i = 0; i < count; ++i) {
+
+		Particle p;
+		p.isEnergyShower = true;
+		p.startPos = centerPos;
+
+		// 円周上の角度(0 ~ 2π)
+		float angle = (2.0f * std::numbers::pi_v<float> / count) * i;
+
+		// 奥の平面(Z軸方向)で円状に展開する目標位置
+		p.targetPos = {
+			centerPos.x + radius * std::cos(angle),
+			centerPos.y + radius * std::sin(angle),
+			centerPos.z
+		};
+
+		p.transform.scale = { 1.5f, 1.5f, 1.5f };
+		p.transform.rotate = { 0.0f, 0.0f, 0.0f };
+
+		// 奥の中心から発生
+		p.transform.translate = centerPos;
+
+		// 通常演出と同じランダムカラー設定
+		p.color = { distColor(mRandomEngine), distColor(mRandomEngine), distColor(mRandomEngine), 1.0f };
+
+		p.lifeTime = 6.0f;
+		p.currentTime = 0.0f;
+		p.stateTimer = 0.0f;
+
+		// 時計回りに連続して飛んでいくようディレイを個別に設定
+		p.launchDelay = i * 0.07f;
+		p.state = EnergyShowerState::Expand;
+
+		particles.push_back(p);
+	}
+}
+
 // 初期化関数
 void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex) {
 
@@ -66,7 +117,7 @@ void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descripto
 	// インスタンスのTransformMatrixリソースを作る
 	mInstancingResource = dxPlatform->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
 
-	// 書き込むためのアドレスを取得
+	// 書き込むためのアドレスを取得する
 	mInstancingResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&mInstancingData));
 
 	// 単位行列を書き込む
@@ -132,6 +183,7 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 		billboardMatrix.m[3][2] = 0.0f;
 	}
 
+	// ビルボードの右・上方向ベクトル(ワールド空間)を取得して2D射影軸として活用する
 	// WVP等を計算して、Resourceに書き込む
 	for (std::list<Particle>::iterator particleIterator = particles.begin(); particleIterator != particles.end(); ) {
 
@@ -141,21 +193,96 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 			continue;
 		}
 
-		// isParticlesUpdateがtrueの時のみ移動と時間経過を行う
+		// mIsParticlesUpdateがtrueの時のみ移動と時間経過を行う
 		if (mIsParticlesUpdate) {
 
-			// AccelerationFieldがONの場合、範囲内のParticleに加速度を適用する
-			if (mUseAccelerationField) {
-				if (IsCollision(mAccelerationField.area, particleIterator->transform.translate)) {
-					particleIterator->velocity += mAccelerationField.acceleration * kDeltaTime;
+			if (particleIterator->isEnergyShower) {
+
+				// --- エナジーシャワー風演出の更新 ---
+				particleIterator->stateTimer += kDeltaTime;
+				particleIterator->currentTime += kDeltaTime;
+
+				switch (particleIterator->state) {
+				case EnergyShowerState::Expand: {
+
+					// 奥でスッと円形に広がるフェーズ(0.35秒)
+					float duration = 0.35f;
+					float t = particleIterator->stateTimer / duration;
+
+					if (t > 1.0f) {
+						t = 1.0f;
+					}
+
+					// イージング(EaseOutQuart)で円状へ補間移動
+					float easeT = Easing::EaseOutQuart(t);
+					particleIterator->transform.translate = Easing::Lerp(particleIterator->startPos, particleIterator->targetPos, easeT);
+
+					// 放射状(外側)を向くようにZ軸回転
+					Vector3 diff = particleIterator->targetPos - particleIterator->startPos;
+					particleIterator->transform.rotate.z = std::atan2f(diff.y, diff.x) - (std::numbers::pi_v<float> / 2.0f);
+
+					if (t >= 1.0f) {
+						particleIterator->state = EnergyShowerState::Charge;
+						particleIterator->stateTimer = 0.0f;
+					}
+					break;
 				}
+				case EnergyShowerState::Charge: {
+
+					// 溜め・発射待ちフェーズ
+					if (particleIterator->stateTimer >= (0.22f + particleIterator->launchDelay)) {
+						particleIterator->state = EnergyShowerState::Fly;
+						particleIterator->stateTimer = 0.0f;
+
+						// 展開位置の左右の広がりを少しだけ中央へ寄せつつ、手前へゆるやかに滑空する方向を設定する
+						float offsetX = particleIterator->transform.translate.x - particleIterator->startPos.x;
+						float localVectorX = offsetX * 0.12f;
+
+						// 真下ではなく、ゆるやかに下へ滑空する角度
+						float localVectorY = -0.28f;
+
+						// カメラ手前方向へ真っ直ぐ飛ぶ成分
+						float localVectorZ = 1.0f;
+
+						// ビルボード空間の滑空ベクトルをワールド空間へ変換して正規化する
+						Vector3 direction = MathUtils::TransformMatrix({ localVectorX, localVectorY, localVectorZ }, billboardMatrix);
+						direction = MathUtils::Normalize(direction);
+
+						// 紙飛行機のように一定の角度で手前へ滑空するスピード
+						float speed = 34.0f;
+						particleIterator->velocity = direction * speed;
+
+						// 全ての三角形の先端(尖っている方)が進行方向(手前)をピタッと向くようZ軸・X軸の回転角を算出する
+						float horizontalLength = std::sqrt(localVectorX * localVectorX + localVectorY * localVectorY);
+						particleIterator->transform.rotate.z = std::atan2f(localVectorY, localVectorX) - (std::numbers::pi_v<float> / 2.0f);
+						particleIterator->transform.rotate.x = std::atan2f(localVectorZ, horizontalLength);
+					}
+					break;
+				}
+				case EnergyShowerState::Fly: {
+
+					// そのままの角度で紙飛行機のように手前へ飛翔するフェーズ
+					particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
+
+					// 画面手前を通り抜けて見えなくなったら消去する
+					if (particleIterator->stateTimer > 1.1f) {
+						particleIterator->currentTime = particleIterator->lifeTime;
+					}
+					break;
+				}
+				}
+
+			} else {
+				// --- 通常パーティクルの更新(uvChecker.png用の挙動) ---
+				if (mUseAccelerationField) {
+					if (IsCollision(mAccelerationField.area, particleIterator->transform.translate)) {
+						particleIterator->velocity += mAccelerationField.acceleration * kDeltaTime;
+					}
+				}
+
+				particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
+				particleIterator->currentTime += kDeltaTime;
 			}
-
-			// 速度を適用
-			particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
-
-			// 経過時間を加算する
-			particleIterator->currentTime += kDeltaTime;
 		}
 
 		// GPUのリソース上限数(kNumMaxInstance)を超えて書き込まないようにバッファオーバーラン対策
@@ -163,16 +290,21 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 
 			// 操作用Transform(currentTransform)と各インスタンスのTransformを合成する
 			Vector3 scale = { particleIterator->transform.scale.x * currentTransform.scale.x, particleIterator->transform.scale.y * currentTransform.scale.y, particleIterator->transform.scale.z * currentTransform.scale.z };
-			Vector3 rotate = { particleIterator->transform.rotate.x + currentTransform.rotate.x, particleIterator->transform.rotate.y + currentTransform.rotate.y, particleIterator->transform.rotate.z + currentTransform.rotate.z };
-			Vector3 translate = { particleIterator->transform.translate.x + currentTransform.translate.x, particleIterator->transform.translate.y + currentTransform.translate.y, particleIterator->transform.translate.z + currentTransform.translate.z };
+			Vector3 rotate = particleIterator->transform.rotate + currentTransform.rotate;
+			Vector3 translate = particleIterator->transform.translate + currentTransform.translate;
 
-			// ワールド行列の計算(useBillboardがtrueの場合は scaleMatrix * billboardMatrix * translateMatrix で計算する)
+			// ワールド行列の計算
 			Matrix4x4 worldMatrix;
 
 			if (mUseBillboard) {
 				Matrix4x4 scaleMatrix = MathUtils::MakeScaleMatrix(scale);
+				// 各パーティクルの向き(X軸・Z軸回転)を適用
+				Matrix4x4 rotateXMatrix = MathUtils::MakeRotateXMatrix(rotate.x);
+				Matrix4x4 rotateZMatrix = MathUtils::MakeRotateZMatrix(rotate.z);
 				Matrix4x4 translateMatrix = MathUtils::MakeTranslateMatrix(translate);
-				worldMatrix = MathUtils::Multiply(scaleMatrix, MathUtils::Multiply(billboardMatrix, translateMatrix));
+
+				// scale * rotateX * rotateZ * billboard * translate
+				worldMatrix = MathUtils::Multiply(scaleMatrix, MathUtils::Multiply(rotateXMatrix, MathUtils::Multiply(rotateZMatrix, MathUtils::Multiply(billboardMatrix, translateMatrix))));
 			} else {
 				worldMatrix = MathUtils::MakeAffineMatrix(scale, rotate, translate);
 			}
@@ -183,20 +315,26 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 			mInstancingData[mNumInstance].world = worldMatrix;
 			mInstancingData[mNumInstance].color = particleIterator->color;
 
-			// 経過時間の進行度割合(0.0f ~ 1.0f)を計算
-			float t = particleIterator->currentTime / particleIterator->lifeTime;
-
-			// 徐々に透明化させるためにイージングを適用する
-			// EaseInQuartの場合、消え際に向かって急速に透明化していく
-			float alpha = 1.0f - Easing::EaseInQuart(t);
-
-			// 算出したアルファ値をinstancingDataに書き込む
-			mInstancingData[mNumInstance].color.w = alpha;
+			// アルファ値の計算
+			float alpha = 1.0f;
+			if (particleIterator->isEnergyShower) {
+				if (particleIterator->state == EnergyShowerState::Fly) {
+					// 画面手前に接近した際のフェードアウト
+					if (particleIterator->stateTimer > 0.75f) {
+						float fadeT = std::clamp((particleIterator->stateTimer - 0.75f) / 0.35f, 0.0f, 1.0f);
+						alpha = Easing::Lerp(1.0f, 0.0f, fadeT);
+					}
+				}
+				mInstancingData[mNumInstance].color.w = alpha;
+			} else {
+				float t = particleIterator->currentTime / particleIterator->lifeTime;
+				alpha = 1.0f - Easing::EaseInQuart(t);
+				mInstancingData[mNumInstance].color.w = alpha;
+			}
 
 			// 生きているパーティクルの数を1つカウントする
 			++mNumInstance;
 		}
-
 		// 次のパーティクルに進める
 		++particleIterator;
 	}

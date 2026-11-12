@@ -9,15 +9,44 @@
 // 前方宣言
 class DirectXPlatform;
 
+// エナジーシャワー風演出のフェーズ
+enum class EnergyShowerState {
+	// 奥での円形展開
+	Expand,
+	// 溜め・待機
+	Charge,
+	// 手前への高速飛翔
+	Fly
+};
+
 // パーティクル
 struct Particle {
-	Transform transform;
-	Vector3 velocity;
-	Vector4 color;
+
+	Transform transform{};
+	Vector3 velocity{ 0.0f, 0.0f, 0.0f };
+	Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
+
 	// 生存可能な時間
-	float lifeTime;
+	float lifeTime = 0.0f;
+
 	// 発生してからの経過時間
-	float currentTime;
+	float currentTime = 0.0f;
+
+	// エナジーシャワー風演出用データ
+	bool isEnergyShower = false;
+	EnergyShowerState state = EnergyShowerState::Expand;
+
+	// 奥の中心位置
+	Vector3 startPos{ 0.0f, 0.0f, 0.0f };
+
+	// 奥での円形配置目標位置
+	Vector3 targetPos{ 0.0f, 0.0f, 0.0f };
+
+	// フェーズ内の経過時間
+	float stateTimer = 0.0f;
+
+	// 発射までのディレイ時間
+	float launchDelay = 0.0f;
 };
 
 // GPUへ転送するデータ用のパーティクル構造体
@@ -58,6 +87,9 @@ public:
 
 	// Emitterでパーティクルを生成して内部リストに追加する関数
 	void Emit(const Emitter& emitter);
+
+	// エナジーシャワー風演出の生成関数
+	void EmitEnergyShower(const Vector3& centerPos = { 0.0f, -2.0f, -10.0f }, uint32_t count = 24);
 
 	// 初期化関数
 	void Initialize(DirectXPlatform* dxPlatform, uint32_t descriptorIndex);
