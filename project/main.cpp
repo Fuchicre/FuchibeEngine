@@ -1298,7 +1298,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region サウンドの再生
 
-	audioManager->SoundPlayWave(soundData1);
+	/*audioManager->SoundPlayWave(soundData1);*/
 
 #pragma endregion
 
