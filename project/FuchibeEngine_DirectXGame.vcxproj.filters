@@ -94,7 +94,7 @@
     <ClCompile Include="engine\utility\StringUtility.cpp">
       <Filter>engine\utility</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="application\main.cpp">
       <Filter>application</Filter>
     </ClCompile>
   </ItemGroup>
