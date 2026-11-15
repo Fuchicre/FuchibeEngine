@@ -370,3 +370,6 @@ imgui.ini
 # resources以下にあるobjファイルをgitに登録
 *.obj
 !resources/**/*.obj
+
+# bファイルの除外
+project/b
