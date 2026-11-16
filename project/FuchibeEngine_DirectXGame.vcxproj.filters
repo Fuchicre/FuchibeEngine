@@ -35,6 +35,9 @@
     <Filter Include="application">
       <UniqueIdentifier>{6c7b6979-6bcf-40a1-8759-388852764cb4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="engine\2d">
+      <UniqueIdentifier>{414db7d9-9011-4bf4-81c5-5b169912f68f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="externals\imgui\imgui.cpp">
@@ -96,6 +99,12 @@
     </ClCompile>
     <ClCompile Include="application\main.cpp">
       <Filter>application</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\2d\SpriteManager.cpp">
+      <Filter>engine\2d</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\2d\SpriteInstance.cpp">
+      <Filter>engine\2d</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -172,6 +181,12 @@
     </ClInclude>
     <ClInclude Include="engine\utility\StringUtility.h">
       <Filter>engine\utility</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\2d\SpriteManager.h">
+      <Filter>engine\2d</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\2d\SpriteInstance.h">
+      <Filter>engine\2d</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

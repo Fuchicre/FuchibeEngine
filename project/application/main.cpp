@@ -23,6 +23,8 @@
 #include "DebugCamera.h"
 #include "D3DResourceLeakChecker.h"
 #include "ParticleManager.h"
+#include "SpriteManager.h"
+#include "SpriteInstance.h"
 #include <random>
 #include <memory>
 #include <numbers>
@@ -227,6 +229,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	ID3D12Device* device = dxPlatform->GetDevice();
 	ID3D12GraphicsCommandList* commandList = dxPlatform->GetCommandList();
+
+	// スプライト共通部の初期化
+	SpriteManager* spriteManager = nullptr;
+	spriteManager = new SpriteManager();
+	spriteManager->Initialize(dxPlatform);
+
+	// スプライト1枚分の初期化
+	SpriteInstance* spriteInstance = nullptr;
+	spriteInstance = new SpriteInstance();
+	spriteInstance->Initialize();
 
 	//======================================
 	// 入力管理クラスのインスタンス生成と初期化
@@ -554,23 +566,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
-	// BlendModeの種類
-	enum BlendMode {
-		// ブレンドなし
-		kBlendModeNone,
-		// 通常αブレンド(デフォルト) Src * SrcA + Dest * (1 - SrcA)
-		kBlendModeNormal,
-		// 加算ブレンド Src * SrcA + Dest * 1
-		kBlendModeAdd,
-		// 減算ブレンド Dest * 1 - Src * SrcA
-		kBlendModeSubtract,
-		// 乗算ブレンド Src * 0 + Dest * Src
-		kBlendModeMultiply,
-		// スクリーンブレンド Src * (1 - Dest) + Dest * 1
-		kBlendModeScreen,
-		// 利用してはいけない
-		kCountOfBlendMode
-	};
+	//// BlendModeの種類
+	//enum BlendMode {
+	//	// ブレンドなし
+	//	kBlendModeNone,
+	//	// 通常αブレンド(デフォルト) Src * SrcA + Dest * (1 - SrcA)
+	//	kBlendModeNormal,
+	//	// 加算ブレンド Src * SrcA + Dest * 1
+	//	kBlendModeAdd,
+	//	// 減算ブレンド Dest * 1 - Src * SrcA
+	//	kBlendModeSubtract,
+	//	// 乗算ブレンド Src * 0 + Dest * Src
+	//	kBlendModeMultiply,
+	//	// スクリーンブレンド Src * (1 - Dest) + Dest * 1
+	//	kBlendModeScreen,
+	//	// 利用してはいけない
+	//	kCountOfBlendMode
+	//};
 
 	// BlendModeの要素順に対応する BlendDesc の配列
 	D3D12_BLEND_DESC blendDescs[kCountOfBlendMode] = {
@@ -1716,6 +1728,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 描画!板ポリゴンをインスタンス描画
 		commandList->DrawInstanced(activeVertexCount, instanceCount, 0, 0);
 
+		//==========================================
+		// Sprite(2D)の描画設定
+		//==========================================
+
+		// Spriteの描画準備(Spriteの描画に共通のグラフィックスコマンドを積む)
+		spriteManager->GeneralDrawingSettings();
+
 		// 実際のcommandListのImGui描画コマンドを積む
 #ifdef USE_IMGUI
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
@@ -1754,6 +1773,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// XAudio2の解放処理
 	audioManager->Finalize();
+
+	// SpriteInstanceの解放処理
+	delete spriteInstance;
+	spriteInstance = nullptr;
+
+	// SpriteManagerの解放処理
+	delete spriteManager;
+	spriteManager = nullptr;
 
 	// DirectXPlatformの解放
 	delete dxPlatform;
