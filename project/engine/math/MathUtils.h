@@ -89,6 +89,10 @@ struct Material {
 	int32_t enableLighting;
 	float padding[3];
 	Matrix4x4 uvTransform;
+	// 光沢度
+	float shininess;
+	// 鏡面反射タイプ(0: None, 1: Phong, 2: Blinn-Phong)
+	int32_t specularType;
 };
 
 // UVTransform用の変数
@@ -127,6 +131,10 @@ struct ModelData {
 
 struct Camera {
 	Vector3 pos;
+};
+
+struct CameraForGPU {
+	Vector3 worldPosition;
 };
 
 class MathUtils {

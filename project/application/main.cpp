@@ -33,6 +33,13 @@
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "dxcompiler.lib")
 
+// 単体モデル描画用の変換行列・色構造体
+struct ModelTransformationMatrix {
+	Matrix4x4 wvp;
+	Matrix4x4 world;
+	Vector4 color;
+};
+
 //=======================
 // 関数群
 //=======================
@@ -309,7 +316,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// RootParameterの生成
 	// PixelShaderのMaterialとVertexShaderのTransformとSRV
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 
 	// CBVを使う
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -350,8 +357,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// PixelShaderで使う
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-	// レジスタ番号3を使う
-	rootParameters[3].Descriptor.ShaderRegister = 3;
+	// レジスタ番号1を使う(DirectionalLight: b1)
+	rootParameters[3].Descriptor.ShaderRegister = 1;
+
+	// CBVを使う
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+
+	// PixelShaderで使う
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// レジスタ番号2を使う(Camera: b2)
+	rootParameters[4].Descriptor.ShaderRegister = 2;
 
 	// ルートパラメータ配列へのポインタ
 	descriptionRootSignature.pParameters = rootParameters;
@@ -786,6 +802,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	planeModelMaterialData->enableLighting = true;
 	planeModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+	planeModelMaterialData->shininess = 30.0f;
+	planeModelMaterialData->specularType = 0;
 
 #pragma endregion
 
@@ -812,6 +830,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	axisModelMaterialData->enableLighting = true;
 	axisModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+	axisModelMaterialData->shininess = 30.0f;
+	axisModelMaterialData->specularType = 0;
 
 #pragma endregion
 
@@ -838,6 +858,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// Lightingを有効にする
 	fenceModelMaterialData->enableLighting = true;
 	fenceModelMaterialData->uvTransform = MathUtils::MakeIdentity4x4();
+	fenceModelMaterialData->shininess = 30.0f;
+	fenceModelMaterialData->specularType = 0;
 
 #pragma endregion
 
@@ -868,6 +890,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	//=================================
+	// CameraResourceの生成
+	//=================================
+
+#pragma region CameraResourceの生成
+
+	// Camera用のResourceを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource = dxPlatform->CreateBufferResource(sizeof(CameraForGPU));
+
+	// CameraResourceにデータを書き込む
+	CameraForGPU* cameraData = nullptr;
+
+	// 書き込むためのアドレスを取得する
+	cameraResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
+
+	// 初期値を代入する
+	cameraData->worldPosition = { 0.0f, 0.0f, 0.0f };
+
+#pragma endregion
+
 	//====================================
 	// TransformMatrixResourceの生成
 	//====================================
@@ -889,6 +931,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// HLSL側のworldにも単位行列(または物体のワールド行列)を書き込む
 	*(wvpData + 1) = MathUtils::MakeIdentity4x4();
 
+	// 単体モデル(axis, fence)用のStructuredBufferリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> modelTransformResource = dxPlatform->CreateBufferResource(sizeof(ModelTransformationMatrix));
+	ModelTransformationMatrix* modelTransformData = nullptr;
+	modelTransformResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&modelTransformData));
+	modelTransformData->wvp = MathUtils::MakeIdentity4x4();
+	modelTransformData->world = MathUtils::MakeIdentity4x4();
+	modelTransformData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 #pragma endregion
 
 	//===========================
@@ -897,7 +947,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region VertexBafferViewの設定
 
-	//================ scheduling plane.objモデル
+	//=======================
 	// plane.objモデル
 	//=======================
 
@@ -1259,6 +1309,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma endregion
 
+	// 単体モデル(axis, fence)用のStructuredBufferのSRVを作成(インデックス6の場所に書き込まれる)
+	D3D12_SHADER_RESOURCE_VIEW_DESC modelTransformSrvDesc{};
+	modelTransformSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	modelTransformSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	modelTransformSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	modelTransformSrvDesc.Buffer.FirstElement = 0;
+	modelTransformSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	modelTransformSrvDesc.Buffer.NumElements = 1;
+	modelTransformSrvDesc.Buffer.StructureByteStride = sizeof(ModelTransformationMatrix);
+	device->CreateShaderResourceView(modelTransformResource.Get(), &modelTransformSrvDesc, dxPlatform->GetSRVCPUDescriptorHandle(6));
+
 #pragma endregion
 
 	//============================
@@ -1425,11 +1486,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::RadioButton("Axis (axis.obj)", &currentModelIndex, 2);
 		ImGui::RadioButton("Fence (fence.obj)", &currentModelIndex, 3);
 
-		// モデル選択のリセットボタン
-		if (ImGui::Button("Reset Model Selection")) {
-			currentModelIndex = 0;
-		}
-
 		// ラジオボタンの操作で currentModelIndex が変更された場合にポインタを再更新する
 		switch (currentModelIndex) {
 		case 0:
@@ -1484,6 +1540,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			currentTransform->scale = { 1.0f, 1.0f, 1.0f };
 		}
 
+		// SRTの一括リセットボタン
+		if (ImGui::Button("Reset SRT")) {
+			currentTransform->scale = { 1.0f, 1.0f, 1.0f };
+			currentTransform->rotate = { 0.0f, 0.0f, 0.0f };
+			currentTransform->translate = { 0.0f, 0.0f, 0.0f };
+		}
+
 		// パーティクル更新のON/OFFチェックボックス
 		ImGui::Checkbox("Particles Update", particleManager->GetIsParticlesUpdatePtr());
 
@@ -1518,7 +1581,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Checkbox("useBillboard", particleManager->GetUseBillboardPtr());
 
 		//===========================================
-		// SpriteのUV座標系を動かせる
+		// SpriteのUV座標系
 		//===========================================
 
 		ImGui::Separator();
@@ -1544,6 +1607,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// マテリアルカラーのリセットボタン
 		if (ImGui::Button("Reset Color")) {
 			currentMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+
+		// 光沢度(shininess)の調整スライダー
+		ImGui::DragFloat("Shininess", &currentMaterialData->shininess, 0.5f, 1.0f, 200.0f);
+
+		// 光沢度(shininess)のリセットボタン
+		if (ImGui::Button("Reset Shininess")) {
+			currentMaterialData->shininess = 30.0f;
+		}
+
+		// 鏡面反射モデルの切り替えコンボボックス
+		const char* specularTypeItems[] = { "None", "Phong", "Blinn-Phong" };
+		ImGui::Combo("Specular Type", &currentMaterialData->specularType, specularTypeItems, IM_ARRAYSIZE(specularTypeItems));
+
+		// 鏡面反射モデルのリセットボタン
+		if (ImGui::Button("Reset Specular Type")) {
+			currentMaterialData->specularType = 0;
 		}
 
 		//===========================================
@@ -1573,6 +1653,49 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			directionalLightData->intensity = 1.0f;
 		}
 
+		//===========================================
+		// 全項目の一括リセット
+		//===========================================
+
+		ImGui::Separator();
+
+		if (ImGui::Button("Reset All")) {
+
+			// ブレンドモード
+			currentBlendMode = kBlendModeNone;
+
+			// カメラ
+			useDebugCamera = false;
+			debugCamera->Reset();
+			cameraTransform = { { 1.0f, 1.0f, 1.0f },{ std::numbers::pi_v<float> / 3.0f, std::numbers::pi_v<float>, 0.0f },{ 0.0f, 23.0f, 10.0f } };
+
+			// 選択中のモデルのTransform
+			currentTransform->scale = { 1.0f, 1.0f, 1.0f };
+			currentTransform->rotate = { 0.0f, 0.0f, 0.0f };
+			currentTransform->translate = { 0.0f, 0.0f, 0.0f };
+
+			// 選択中のモデルのUV Transform
+			currentUvTransform->scale = { 1.0f, 1.0f, 1.0f };
+			currentUvTransform->rotate = { 0.0f, 0.0f, 0.0f };
+			currentUvTransform->translate = { 0.0f, 0.0f, 0.0f };
+
+			// 選択中のモデルのマテリアル(色・光沢度・鏡面反射モデル)
+			currentMaterialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+			currentMaterialData->shininess = 30.0f;
+			currentMaterialData->specularType = 0;
+
+			// パーティクル・エミッター
+			*particleManager->GetIsParticlesUpdatePtr() = false;
+			*particleManager->GetUseAccelerationFieldPtr() = false;
+			particleManager->ResetParticles();
+			emitter.transform.translate = { 0.0f, 0.0f, 0.0f };
+			emitter.frequencyTime = 0.0f;
+
+			// ライト
+			directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+			directionalLightData->direction = MathUtils::Normalize({ 0.0f, -1.0f, 0.0f });
+			directionalLightData->intensity = 1.0f;
+		}
 		ImGui::End();
 #endif
 
@@ -1609,6 +1732,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			projectionMatrix = MathUtils::MakePerspectiveFovMatrix(0.45f, static_cast<float>(WindowsApi::kClientWidth) / static_cast<float>(WindowsApi::kClientHeight), 0.1f, 100.0f);
 		}
 
+		// カメラのワールド座標を定数バッファに書き込む
+		cameraData->worldPosition = { cameraMatrix.m[3][0], cameraMatrix.m[3][1], cameraMatrix.m[3][2] };
+
 		// ViewProjectionMatrixの計算
 		Matrix4x4 viewProjectionMatrix = MathUtils::Multiply(viewMatrix, projectionMatrix);
 
@@ -1629,6 +1755,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// パーティクルの更新処理
 		particleManager->Update(viewProjectionMatrix, cameraMatrix, *currentTransform, kDeltaTime);
+
+		// 単体モデル(axis, fence)用の行列・色の更新(パーティクルの色に影響されないように白色を固定で設定する。Billboardは適用する)
+		Matrix4x4 modelWorldMatrix;
+
+		if (*particleManager->GetUseBillboardPtr()) {
+			Matrix4x4 backToFrontMatrix = MathUtils::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, std::numbers::pi_v<float>, 0.0f }, { 0.0f, 0.0f, 0.0f });
+			Matrix4x4 billboardMatrix = MathUtils::Multiply(backToFrontMatrix, cameraMatrix);
+			billboardMatrix.m[3][0] = 0.0f;
+			billboardMatrix.m[3][1] = 0.0f;
+			billboardMatrix.m[3][2] = 0.0f;
+
+			Matrix4x4 scaleMatrix = MathUtils::MakeScaleMatrix(currentTransform->scale);
+			Matrix4x4 rotateMatrix = MathUtils::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, currentTransform->rotate, { 0.0f, 0.0f, 0.0f });
+			Matrix4x4 translateMatrix = MathUtils::MakeTranslateMatrix(currentTransform->translate);
+			modelWorldMatrix = MathUtils::Multiply(MathUtils::Multiply(MathUtils::Multiply(scaleMatrix, rotateMatrix), billboardMatrix), translateMatrix);
+		} else {
+			modelWorldMatrix = MathUtils::MakeAffineMatrix(currentTransform->scale, currentTransform->rotate, currentTransform->translate);
+		}
+		modelTransformData->wvp = MathUtils::Multiply(modelWorldMatrix, viewProjectionMatrix);
+		modelTransformData->world = modelWorldMatrix;
+		modelTransformData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		// UVTransform行列の作成と更新
 		Matrix4x4 uvTransformMatrix = MathUtils::MakeScaleMatrix(currentUvTransform->scale);
@@ -1685,7 +1832,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//==========================================
 
 		// instancing用のDataを読むためにStructuredBufferのSRVを設定する
-		commandList->SetGraphicsRootDescriptorTable(1, particleManager->GetSrvHandleGPU());
+		if (currentModelIndex == 0 || currentModelIndex == 1) {
+			commandList->SetGraphicsRootDescriptorTable(1, particleManager->GetSrvHandleGPU());
+		} else {
+			commandList->SetGraphicsRootDescriptorTable(1, dxPlatform->GetSRVGPUDescriptorHandle(6));
+		}
+
+		// DirectionalLight用のCBufferの場所を設定
+		commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
+
+		// Camera用のCBufferの場所を設定
+		commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
 
 		// 選択されているモデルに応じて【マテリアル・頂点バッファ・テクスチャ】をすべて正しく切り替える
 		if (currentModelIndex == 0) {
