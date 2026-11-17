@@ -330,6 +330,20 @@ Matrix4x4 MathUtils::MakeIdentity4x4() {
 
 }
 
+// 転置行列の作成関数
+Matrix4x4 MathUtils::Transpose(const Matrix4x4& m) {
+
+	Matrix4x4 result{};
+
+	for (int row = 0; row < 4; row++) {
+		for (int col = 0; col < 4; col++) {
+			// 行と列のインデックスを入れ替えて代入する
+			result.m[col][row] = m.m[row][col];
+		}
+	}
+	return result;
+}
+
 // 座標変換行列
 Vector3 MathUtils::TransformMatrix(const Vector3& vector, const Matrix4x4& matrix) {
 

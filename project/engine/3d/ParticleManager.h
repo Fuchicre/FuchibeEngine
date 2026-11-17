@@ -24,6 +24,7 @@ struct Particle {
 struct ParticleForGPU {
 	Matrix4x4 wvp;
 	Matrix4x4 world;
+	Matrix4x4 worldInverseTranspose;
 	Vector4 color;
 };
 

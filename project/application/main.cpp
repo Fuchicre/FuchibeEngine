@@ -37,6 +37,7 @@
 struct ModelTransformationMatrix {
 	Matrix4x4 wvp;
 	Matrix4x4 world;
+	Matrix4x4 worldInverseTranspose;
 	Vector4 color;
 };
 
@@ -937,6 +938,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	modelTransformResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&modelTransformData));
 	modelTransformData->wvp = MathUtils::MakeIdentity4x4();
 	modelTransformData->world = MathUtils::MakeIdentity4x4();
+	modelTransformData->worldInverseTranspose = MathUtils::MakeIdentity4x4();
 	modelTransformData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 #pragma endregion
@@ -1380,6 +1382,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 0: Plane(uvChecker.png), 1: Plane(circle.png), 2: Axis(axis.obj), 3: Fence(fence.obj)
 	int currentModelIndex = 0;
 
+	// ImGui操作用のライト向き変数(正規化でスライダー値が書き換わるのを防ぐため分離する)
+	Vector3 lightDirectionInput = { 0.0f, -1.0f, 0.0f };
+
 #pragma endregion
 
 	//=====================
@@ -1640,14 +1645,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 10.0f);
 
 		// ライトの向き(-10.0 ~ 10.0 の範囲で動かす)
-		if (ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -10.0f, 10.0f)) {
-
-			// 値が変わったら毎回正規化する
-			directionalLightData->direction = MathUtils::Normalize(directionalLightData->direction);
+		if (ImGui::SliderFloat3("Light Direction", &lightDirectionInput.x, -10.0f, 10.0f)) {
+			// ゼロベクトルでのゼロ除算を防ぎつつ、値が変わったら毎回正規化する
+			float lengthSquared = lightDirectionInput.x * lightDirectionInput.x + lightDirectionInput.y * lightDirectionInput.y + lightDirectionInput.z * lightDirectionInput.z;
+			if (lengthSquared > 0.000001f) {
+				directionalLightData->direction = MathUtils::Normalize(lightDirectionInput);
+			}
 		}
 
 		// ライト設定全体のリセットボタン
 		if (ImGui::Button("Reset Light")) {
+			lightDirectionInput = { 0.0f, -1.0f, 0.0f };
 			directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 			directionalLightData->direction = MathUtils::Normalize({ 0.0f, -1.0f, 0.0f });
 			directionalLightData->intensity = 1.0f;
@@ -1692,6 +1700,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			emitter.frequencyTime = 0.0f;
 
 			// ライト
+			lightDirectionInput = { 0.0f, -1.0f, 0.0f };
 			directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 			directionalLightData->direction = MathUtils::Normalize({ 0.0f, -1.0f, 0.0f });
 			directionalLightData->intensity = 1.0f;
@@ -1775,6 +1784,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 		modelTransformData->wvp = MathUtils::Multiply(modelWorldMatrix, viewProjectionMatrix);
 		modelTransformData->world = modelWorldMatrix;
+		modelTransformData->worldInverseTranspose = MathUtils::Transpose(MathUtils::Inverse(modelWorldMatrix));
 		modelTransformData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		// UVTransform行列の作成と更新

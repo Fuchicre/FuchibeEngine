@@ -176,6 +176,9 @@ public:
 	// 単位行列の作成
 	static Matrix4x4 MakeIdentity4x4();
 
+	// 転置行列の作成関数
+	static Matrix4x4 Transpose(const Matrix4x4& m);
+
 	// 座標変換行列
 	static Vector3 TransformMatrix(const Vector3& vector, const Matrix4x4& matrix);
 

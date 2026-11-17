@@ -6,6 +6,8 @@ struct TransformationMatrix {
     float32_t4x4 wvp;
     // ワールド行列
     float32_t4x4 world;
+    // ワールド逆転置行列
+    float32_t4x4 worldInverseTranspose;
     // オブジェクトの色
     float32_t4 color;
 };
@@ -32,7 +34,7 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
     output.texcoord = input.texcoord;
 
     // 法線をワールド空間に変換して正規化(平行移動成分を除くため3x3行列を使用する)
-    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrices[instanceId].world));
+    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrices[instanceId].worldInverseTranspose));
 
     // インスタンスごとの色を渡す
     output.color = gTransformationMatrices[instanceId].color;

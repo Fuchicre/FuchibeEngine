@@ -73,6 +73,7 @@ void ParticleManager::Initialize(DirectXPlatform* dxPlatform, uint32_t descripto
 	for (uint32_t index = 0; index < kNumMaxInstance; index++) {
 		mInstancingData[index].wvp = MathUtils::MakeIdentity4x4();
 		mInstancingData[index].world = MathUtils::MakeIdentity4x4();
+		mInstancingData[index].worldInverseTranspose = MathUtils::MakeIdentity4x4();
 		mInstancingData[index].color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	}
 
@@ -181,6 +182,7 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 
 			mInstancingData[mNumInstance].wvp = worldViewProjectionMatrix;
 			mInstancingData[mNumInstance].world = worldMatrix;
+			mInstancingData[mNumInstance].worldInverseTranspose = MathUtils::Transpose(MathUtils::Inverse(worldMatrix));
 			mInstancingData[mNumInstance].color = particleIterator->color;
 
 			// 経過時間の進行度割合(0.0f ~ 1.0f)を計算
@@ -196,7 +198,6 @@ void ParticleManager::Update(const Matrix4x4& viewProjectionMatrix, const Matrix
 			// 生きているパーティクルの数を1つカウントする
 			++mNumInstance;
 		}
-
 		// 次のパーティクルに進める
 		++particleIterator;
 	}
