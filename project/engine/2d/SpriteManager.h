@@ -37,7 +37,7 @@ private:
 	void CreateRootSignature();
 
 	// グラフィックスパイプラインの生成関数
-	void CreategraphicsPilelineState();
+	void CreateGraphicsPipelineState();
 
 private:
 	DirectXPlatform* mDXPlatform = nullptr;

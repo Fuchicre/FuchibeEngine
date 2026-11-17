@@ -238,7 +238,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// スプライト1枚分の初期化
 	SpriteInstance* spriteInstance = nullptr;
 	spriteInstance = new SpriteInstance();
-	spriteInstance->Initialize();
+	spriteInstance->Initialize(spriteManager);
 
 	//======================================
 	// 入力管理クラスのインスタンス生成と初期化

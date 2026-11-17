@@ -19,7 +19,7 @@ void SpriteManager::Initialize(DirectXPlatform* directXPlatform) {
 	CreateRootSignature();
 
 	// グラフィックスパイプラインの生成
-	CreategraphicsPilelineState();
+	CreateGraphicsPipelineState();
 }
 
 // 共通描画設定
@@ -186,7 +186,7 @@ void SpriteManager::CreateRootSignature() {
 }
 
 // グラフィックスパイプラインの生成関数
-void SpriteManager::CreategraphicsPilelineState() {
+void SpriteManager::CreateGraphicsPipelineState() {
 
 	//====================
 	// InputLayoutの設定
